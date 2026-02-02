@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/Login";
 import SolrCluster from "./pages/SolrCluster";
@@ -8,14 +8,16 @@ import SolrSchema from "./pages/SolrSchema";
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Login />} />
+      {/* page par défaut */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+
+      <Route path="/login" element={<Login />} />
       <Route path="/solr-cluster" element={<SolrCluster />} />
-
-      {/* details serveur */}
       <Route path="/solr/server/:name" element={<SolrServerDetails />} />
-
-      {/* schema d’un core */}
       <Route path="/solr/server/:name/schema/:core" element={<SolrSchema />} />
+
+      {/* fallback 404 */}
+      <Route path="*" element={<div style={{ padding: 30 }}>404</div>} />
     </Routes>
   );
 }
