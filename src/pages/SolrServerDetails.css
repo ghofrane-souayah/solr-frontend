@@ -1,0 +1,153 @@
+.page {
+  padding: 30px;
+  color: #e6edf3;
+  background: radial-gradient(circle at top, #0b2a3c, #061a25);
+  min-height: 100vh;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #0d3b56;
+  color: #e6edf3;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn:hover {
+  background: #145374;
+}
+
+.btn.link {
+  background: transparent;
+  border: 1px solid #2b5165;
+  text-decoration: none;
+}
+
+/* Cards */
+.card {
+  background: linear-gradient(180deg, #0f2e3f, #0b2433);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #16384d;
+}
+
+.sectionTitle {
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+/* Grid infos */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.info {
+  background: #0c2533;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #183c52;
+}
+
+.label {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.value {
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.mono {
+  font-family: monospace;
+}
+
+/* Status */
+.status {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.status.up {
+  background: #123f2f;
+  color: #2ee88c;
+}
+
+.status.down {
+  background: #3d1b1b;
+  color: #ff6b6b;
+}
+
+/* Health */
+.health {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+/* Table */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 10px;
+  border-bottom: 1px solid #1e4b63;
+  text-align: left;
+}
+
+.table th {
+  opacity: 0.7;
+}
+
+/* Notices */
+.notice {
+  padding: 12px;
+  border-radius: 10px;
+  background: #16384d;
+}
+
+.notice.warn {
+  background: #3a2e0b;
+  color: #ffdd57;
+}
+
+.notice.error {
+  background: #3b1616;
+  color: #ff6b6b;
+}
+.coreLink {
+  color: #7cdcff;
+  text-decoration: none;
+  font-weight: 700;
+}
+.coreLink:hover {
+  text-decoration: underline;
+}
