@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import "./SolrCluster.css";
 
@@ -11,37 +11,68 @@ export default function SolrCluster() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ✅ Accordion state: open/close per server
+  // Accordion state
   const [openCores, setOpenCores] = useState({});
   const toggleCores = (serverName) =>
     setOpenCores((prev) => ({ ...prev, [serverName]: !prev[serverName] }));
 
+  // ✅ évite double interval en dev (StrictMode)
+  const startedRef = useRef(false);
+
   const load = async () => {
     setError("");
     setLoading(true);
+
+    const token = localStorage.getItem("token");
+
     try {
-      const res = await fetch(API);
+      const res = await fetch(API, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("UNAUTHORIZED");
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
       const json = await res.json();
+      console.log("monitoring response =", json); // ✅ debug
       setData(json);
     } catch (e) {
       console.error(e);
       setError(
-        "Erreur lors du chargement des serveurs Solr (backend down ? CORS ? URL ?)"
+        e?.message === "UNAUTHORIZED"
+          ? "Accès refusé / session expirée. Reconnecte-toi."
+          : `Erreur chargement: ${e?.message || "unknown"}`
       );
+      setData(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
     load();
     const id = setInterval(load, 5000);
+
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const servers = data?.nodes || [];
+  // ✅ Supporte plusieurs formats backend: {nodes:[]}, {servers:[]}, ou []
+  const servers = useMemo(() => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.nodes)) return data.nodes;
+    if (Array.isArray(data.servers)) return data.servers;
+    return [];
+  }, [data]);
 
   const filteredServers = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -90,7 +121,7 @@ export default function SolrCluster() {
         </div>
       </div>
 
-      {/* ✅ PRO LAYOUT: sidebar + main */}
+      {/* LAYOUT */}
       <div className="layout">
         {/* LEFT: OVERVIEW */}
         <aside className="side">
@@ -163,7 +194,7 @@ export default function SolrCluster() {
 
             {!data && !error && <div className="notice">⏳ Chargement...</div>}
 
-            {data && filteredServers.length === 0 && (
+            {data && !loading && filteredServers.length === 0 && (
               <div className="notice">Aucun serveur ne correspond au filtre.</div>
             )}
 
@@ -172,10 +203,11 @@ export default function SolrCluster() {
                 const cores = Array.isArray(s.cores) ? s.cores : [];
                 const hasCores = cores.length > 0;
                 const isOpen = !!openCores[s.name];
-                const panelId = `cores-panel-${s.name}`;
+                const safeId = String(s.name).replace(/[^a-zA-Z0-9_-]/g, "_");
+                const panelId = `cores-panel-${safeId}`;
 
                 return (
-                  <div key={s.name} className="serverCard">
+                  <div key={`${s.name}-${s.host}-${s.port}`} className="serverCard">
                     <div className="serverTop">
                       <div className="serverName">
                         <Link
@@ -186,11 +218,7 @@ export default function SolrCluster() {
                           {s.name}
                         </Link>{" "}
                         —{" "}
-                        <span
-                          className={`status ${
-                            s.status === "UP" ? "up" : "down"
-                          }`}
-                        >
+                        <span className={`status ${s.status === "UP" ? "up" : "down"}`}>
                           {s.status}
                         </span>
                       </div>
@@ -208,9 +236,7 @@ export default function SolrCluster() {
 
                       <div className={`metric ${pctColor(s.memory)}`}>
                         <div className="metricLabel">Memory</div>
-                        <div className="metricValue">
-                          {Number(s.memory) || 0}%
-                        </div>
+                        <div className="metricValue">{Number(s.memory) || 0}%</div>
                       </div>
 
                       <div className="metric">
@@ -227,19 +253,17 @@ export default function SolrCluster() {
                     </div>
 
                     {Array.isArray(s.alerts) && s.alerts.length > 0 && (
-                      <div className="notice warn">
-                        ⚠️ Alerts: {s.alerts.join(", ")}
-                      </div>
+                      <div className="notice warn">⚠️ Alerts: {s.alerts.join(", ")}</div>
                     )}
 
                     {s.error && <div className="notice error">❌ {s.error}</div>}
 
-                    {/* ✅ PRO ACCORDION FOR CORES */}
+                    {/* CORES */}
                     <div className="coresBlock">
                       <button
                         type="button"
                         className={`coresHeaderBtn ${isOpen ? "open" : ""}`}
-                        onClick={() => hasCores && toggleCores(s.name)}
+                        onClick={() => (hasCores ? toggleCores(s.name) : null)}
                         disabled={!hasCores}
                         aria-expanded={isOpen}
                         aria-controls={panelId}
@@ -248,18 +272,13 @@ export default function SolrCluster() {
                         <div className="coresHeaderLeft">
                           <span className="coresTitle">Cores</span>
                           <span className="coresBadge">{cores.length}</span>
-                          {!hasCores ? (
-                            <span className="coresHintInline">Aucun core</span>
-                          ) : null}
+                          {!hasCores ? <span className="coresHintInline">Aucun core</span> : null}
                         </div>
 
                         <span className={`chev ${isOpen ? "rot" : ""}`}>▾</span>
                       </button>
 
-                      <div
-                        id={panelId}
-                        className={`collapse ${isOpen ? "open" : ""}`}
-                      >
+                      <div id={panelId} className={`collapse ${isOpen ? "open" : ""}`}>
                         <div className="collapseInner">
                           <div className="coresTableWrap">
                             <table className="coresTable">
@@ -280,13 +299,20 @@ export default function SolrCluster() {
                                     <td>{formatBytes(c.sizeInBytes ?? 0)}</td>
                                   </tr>
                                 ))}
+                                {cores.length === 0 && (
+                                  <tr>
+                                    <td colSpan={4} className="muted" style={{ padding: 12 }}>
+                                      Aucun core.
+                                    </td>
+                                  </tr>
+                                )}
                               </tbody>
                             </table>
                           </div>
                         </div>
                       </div>
                     </div>
-                    {/* ✅ END CORES */}
+                    {/* END CORES */}
                   </div>
                 );
               })}
@@ -298,7 +324,6 @@ export default function SolrCluster() {
   );
 }
 
-/** Utils */
 function formatBytes(bytes) {
   const b = Number(bytes) || 0;
   if (b < 1024) return `${b} B`;

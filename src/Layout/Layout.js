@@ -1,47 +1,46 @@
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import "./Layout.css";
 
 export default function Layout() {
-
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem("user") || "null");
-const isAdmin = user?.role === "ADMIN";
+
   const logout = () => {
-    localStorage.removeItem("user");
-    navigate("/login");
+    localStorage.removeItem("token");
+    localStorage.removeItem("roles");
+    localStorage.removeItem("username");
+    navigate("/login", { replace: true });
   };
 
   return (
-    <div className="app">
+    <div className="appShell">
       <aside className="sidebar">
         <div className="brand">Solr Admin</div>
 
         <nav className="nav">
-          <NavLink to="/solr-cluster">Dashboard</NavLink>
-          {isAdmin && <NavLink to="/users">Gestion Comptes</NavLink>}
+          <NavLink to="/solr-cluster" className={({ isActive }) => (isActive ? "navItem active" : "navItem")}>
+            Cluster
+          </NavLink>
+
+          
+
+          <NavLink to="/users" className={({ isActive }) => (isActive ? "navItem active" : "navItem")}>
+            Users
+          </NavLink>
         </nav>
 
-        <div className="footer">
-          <div className="userbox">
-            <div className="email">{user?.email}</div>
-            <div className="role">{user?.role}</div>
-          </div>
-          <button className="logout" onClick={logout}>Logout</button>
-        </div>
+        <button className="logoutBtn" onClick={logout}>Logout</button>
       </aside>
 
-      <div className="main">
+      <main className="main">
         <header className="topbar">
-          <div className="title">Monitoring & Management</div>
-          <div className="subtitle" style={{ margin: 0 }}>
-            {user?.email}
-          </div>
+          <div className="title">Dashboard</div>
+          <div className="userBadge">{localStorage.getItem("username") || "User"}</div>
         </header>
 
-        <main className="content">
+        <section className="content">
           <Outlet />
-        </main>
-      </div>
+        </section>
+      </main>
     </div>
   );
 }

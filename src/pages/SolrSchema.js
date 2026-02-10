@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const API_BASE = "http://localhost:8081/api/solr";
 
 export default function SolrSchema() {
-  const { name: serverName, core } = useParams();
   const nav = useNavigate();
+  const [sp] = useSearchParams();
+
+  const serverName = sp.get("server") || "";
+  const core = sp.get("core") || "";
 
   const [activeTab, setActiveTab] = useState("fields"); // fields | types | dynamic
   const [loading, setLoading] = useState(false);
@@ -16,9 +19,15 @@ export default function SolrSchema() {
   const [dynamicFields, setDynamicFields] = useState([]);
 
   const [search, setSearch] = useState("");
-
-  // ✅ NEW: show/hide table for "fields"
   const [showTable, setShowTable] = useState(true);
+
+  const headers = useMemo(() => {
+    const token = localStorage.getItem("token");
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  }, []);
 
   const filteredFields = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -33,32 +42,37 @@ export default function SolrSchema() {
   const filteredTypes = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return types;
-    return types.filter((t) => (t || "").toLowerCase().includes(q));
+    return types.filter((t) => String(t || "").toLowerCase().includes(q));
   }, [types, search]);
 
   const filteredDynamic = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return dynamicFields;
-    return dynamicFields.filter((d) => (d || "").toLowerCase().includes(q));
+    return dynamicFields.filter((d) => String(d || "").toLowerCase().includes(q));
   }, [dynamicFields, search]);
 
-  async function fetchAll() {
+  async function fetchAll(signal) {
+    if (!serverName || !core) {
+      setError("Route invalide: server/core manquants dans l'URL.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
+      // ⚠️ garde ton endpoint original (collections). Si ton backend utilise cores, on change après.
+      const base = `${API_BASE}/servers/${encodeURIComponent(serverName)}/collections/${encodeURIComponent(core)}/schema`;
+
       const [fRes, tRes, dRes] = await Promise.all([
-        fetch(
-          `${API_BASE}/servers/${serverName}/collections/${core}/schema/fields`
-        ),
-        fetch(
-          `${API_BASE}/servers/${serverName}/collections/${core}/schema/fieldtypes`
-        ),
-        fetch(
-          `${API_BASE}/servers/${serverName}/collections/${core}/schema/dynamicfields`
-        ),
+        fetch(`${base}/fields`, { signal, headers }),
+        fetch(`${base}/fieldtypes`, { signal, headers }),
+        fetch(`${base}/dynamicfields`, { signal, headers }),
       ]);
 
+      if (fRes.status === 401 || tRes.status === 401 || dRes.status === 401) {
+        throw new Error("UNAUTHORIZED");
+      }
       if (!fRes.ok) throw new Error(`Fields error: ${fRes.status}`);
       if (!tRes.ok) throw new Error(`Types error: ${tRes.status}`);
       if (!dRes.ok) throw new Error(`Dynamic error: ${dRes.status}`);
@@ -71,18 +85,25 @@ export default function SolrSchema() {
       setTypes(Array.isArray(tData) ? tData : []);
       setDynamicFields(Array.isArray(dData) ? dData : []);
     } catch (e) {
-      setError(e.message || "Erreur lors du chargement du schema");
+      if (e?.name === "AbortError") return;
+
+      setError(
+        e?.message === "UNAUTHORIZED"
+          ? "Session expirée / accès refusé. Reconnecte-toi."
+          : e.message || "Erreur lors du chargement du schema"
+      );
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchAll();
+    const controller = new AbortController();
+    fetchAll(controller.signal);
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverName, core]);
 
-  // ✅ Optional: when changing tab, show table again
   useEffect(() => {
     if (activeTab === "fields") setShowTable(true);
   }, [activeTab]);
@@ -92,16 +113,16 @@ export default function SolrSchema() {
       <div style={styles.top}>
         <div>
           <div style={styles.breadcrumb}>
-            Solr Cluster / {serverName} / <b>{core}</b>
+            Solr Cluster / {serverName || "?"} / <b>{core || "?"}</b>
           </div>
           <h1 style={styles.h1}>Schema</h1>
           <div style={styles.sub}>
-            Server: <b>{serverName}</b> — Core: <b>{core}</b>
+            Server: <b>{serverName || "?"}</b> — Core: <b>{core || "?"}</b>
           </div>
         </div>
 
         <div style={styles.actions}>
-          <button style={styles.btn} onClick={fetchAll} disabled={loading}>
+          <button style={styles.btn} onClick={() => fetchAll()} disabled={loading}>
             Refresh
           </button>
           <button style={styles.btnGhost} onClick={() => nav(-1)}>
@@ -112,16 +133,8 @@ export default function SolrSchema() {
 
       <div style={styles.tabsRow}>
         <div style={styles.tabs}>
-          <Tab
-            label={`Fields (${fields.length})`}
-            active={activeTab === "fields"}
-            onClick={() => setActiveTab("fields")}
-          />
-          <Tab
-            label={`Types (${types.length})`}
-            active={activeTab === "types"}
-            onClick={() => setActiveTab("types")}
-          />
+          <Tab label={`Fields (${fields.length})`} active={activeTab === "fields"} onClick={() => setActiveTab("fields")} />
+          <Tab label={`Types (${types.length})`} active={activeTab === "types"} onClick={() => setActiveTab("types")} />
           <Tab
             label={`Dynamic (${dynamicFields.length})`}
             active={activeTab === "dynamic"}
@@ -129,12 +142,7 @@ export default function SolrSchema() {
           />
         </div>
 
-        <input
-          style={styles.search}
-          placeholder="Search..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <input style={styles.search} placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       {error ? <div style={styles.error}>{error}</div> : null}
@@ -147,19 +155,12 @@ export default function SolrSchema() {
             <div style={styles.sectionHeader}>
               <h2 style={styles.sectionTitle}>Fields</h2>
 
-              <button
-                style={styles.toggleBtn}
-                onClick={() => setShowTable((v) => !v)}
-              >
+              <button style={styles.toggleBtn} onClick={() => setShowTable((v) => !v)}>
                 {showTable ? "Hide table ▲" : "Show table ▼"}
               </button>
             </div>
 
-            {showTable ? (
-              <FieldsTable data={filteredFields} />
-            ) : (
-              <div style={styles.loading}>Table hidden.</div>
-            )}
+            {showTable ? <FieldsTable data={filteredFields} /> : <div style={styles.loading}>Table hidden.</div>}
           </div>
         ) : activeTab === "types" ? (
           <Pills title="Field Types" items={filteredTypes} />
@@ -173,13 +174,7 @@ export default function SolrSchema() {
 
 function Tab({ label, active, onClick }) {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        ...styles.tab,
-        ...(active ? styles.tabActive : {}),
-      }}
-    >
+    <button onClick={onClick} style={{ ...styles.tab, ...(active ? styles.tabActive : {}) }}>
       {label}
     </button>
   );
@@ -233,14 +228,13 @@ function Pills({ title, items }) {
             {x}
           </span>
         ))}
-        {items.length === 0 ? (
-          <div style={styles.loading}>Aucun élément.</div>
-        ) : null}
+        {items.length === 0 ? <div style={styles.loading}>Aucun élément.</div> : null}
       </div>
     </div>
   );
 }
 
+// styles: identique à ton code (je garde comme tu l’avais)
 const styles = {
   page: {
     minHeight: "100vh",
@@ -295,10 +289,7 @@ const styles = {
     cursor: "pointer",
     fontWeight: 700,
   },
-  tabActive: {
-    background: "#1d4ed8",
-    borderColor: "#2b5cff",
-  },
+  tabActive: { background: "#1d4ed8", borderColor: "#2b5cff" },
   search: {
     width: 320,
     maxWidth: "55vw",
@@ -315,8 +306,6 @@ const styles = {
     borderRadius: 18,
     padding: 16,
   },
-
-  // ✅ NEW: header row with toggle
   sectionHeader: {
     display: "flex",
     alignItems: "center",
@@ -335,7 +324,6 @@ const styles = {
     fontWeight: 800,
     whiteSpace: "nowrap",
   },
-
   tableWrap: {
     overflowX: "auto",
     borderRadius: 14,

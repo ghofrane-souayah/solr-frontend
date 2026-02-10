@@ -3,17 +3,29 @@ import "./Users.css";
 
 const API = "http://localhost:8081/api/users";
 
+function getRoles() {
+  try {
+    const raw = localStorage.getItem("roles");
+    const arr = raw ? JSON.parse(raw) : [];
+    return (Array.isArray(arr) ? arr : [])
+      .map((r) => String(r || "").replace("ROLE_", "").toUpperCase())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 export default function Users() {
-  const me = useMemo(() => JSON.parse(localStorage.getItem("user") || "null"), []);
-  const isAdmin = (me?.role === "ADMIN") || (me?.role === "ROLE_ADMIN");
+  const roles = useMemo(() => getRoles(), []);
+  const isAdmin = roles.includes("ADMIN");
+  const username = useMemo(() => localStorage.getItem("username") || "—", []);
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // modal
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState("add"); // add | edit
+  const [mode, setMode] = useState("add");
   const [form, setForm] = useState({
     id: null,
     username: "",
@@ -23,18 +35,31 @@ export default function Users() {
     password: "",
   });
 
+  const authHeaders = useMemo(() => {
+    const token = localStorage.getItem("token");
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  }, []);
+
   const load = async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(API);
+      const res = await fetch(API, { headers: authHeaders });
+      if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setUsers(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
-      setError("Erreur lors du chargement des utilisateurs.");
       setUsers([]);
+      setError(
+        e?.message === "UNAUTHORIZED"
+          ? "Accès refusé (admin requis) ou session expirée."
+          : "Erreur lors du chargement des utilisateurs."
+      );
     } finally {
       setLoading(false);
     }
@@ -42,6 +67,7 @@ export default function Users() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const openAdd = () => {
@@ -58,13 +84,18 @@ export default function Users() {
   };
 
   const openEdit = (u) => {
+    const role =
+      Array.isArray(u.roles) && u.roles.length
+        ? String(u.roles[0]).replace("ROLE_", "").toUpperCase()
+        : String(u.role?.name || u.role || "USER").replace("ROLE_", "").toUpperCase();
+
     setMode("edit");
     setForm({
       id: u.id,
       username: u.username || "",
       email: u.email || "",
-      role: (u.role?.name ? u.role.name : u.role) || "USER", // ✅ Role enum ou string
-      enabled: !!u.enabled,
+      role,
+      enabled: u.enabled ?? true,
       password: "",
     });
     setOpen(true);
@@ -73,10 +104,10 @@ export default function Users() {
   const submit = async () => {
     if (!isAdmin) return;
 
-    const username = form.username.trim();
-    const email = form.email.trim();
+    const usernameV = form.username.trim();
+    const emailV = form.email.trim();
 
-    if (!username || !email) {
+    if (!usernameV || !emailV) {
       setError("Username et Email sont obligatoires.");
       return;
     }
@@ -88,26 +119,26 @@ export default function Users() {
       if (mode === "add") {
         const res = await fetch(API, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders,
           body: JSON.stringify({
-            username,
-            email,
+            username: usernameV,
+            email: emailV,
             password: form.password,
-            role: form.role,      // "ADMIN" | "USER"
-            enabled: form.enabled // boolean
+            role: form.role,
+            enabled: form.enabled,
           }),
         });
         if (!res.ok) throw new Error(`POST HTTP ${res.status}`);
       } else {
         const res = await fetch(`${API}/${form.id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders,
           body: JSON.stringify({
-            username,
-            email,
-            password: form.password, // optionnel
+            username: usernameV,
+            email: emailV,
+            password: form.password,
             role: form.role,
-            enabled: form.enabled
+            enabled: form.enabled,
           }),
         });
         if (!res.ok) throw new Error(`PUT HTTP ${res.status}`);
@@ -117,7 +148,7 @@ export default function Users() {
       await load();
     } catch (e) {
       console.error(e);
-      setError("Erreur Add/Update. Vérifie les endpoints backend.");
+      setError("Erreur Add/Update. Vérifie endpoints backend (POST/PUT /api/users).");
     } finally {
       setLoading(false);
     }
@@ -129,13 +160,14 @@ export default function Users() {
 
     setLoading(true);
     setError("");
+
     try {
-      const res = await fetch(`${API}/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API}/${id}`, { method: "DELETE", headers: authHeaders });
       if (!res.ok) throw new Error(`DELETE HTTP ${res.status}`);
       await load();
     } catch (e) {
       console.error(e);
-      setError("Erreur suppression.");
+      setError("Erreur suppression. Vérifie endpoint DELETE /api/users/{id}.");
     } finally {
       setLoading(false);
     }
@@ -147,7 +179,7 @@ export default function Users() {
         <div>
           <div className="usersTitle">Gestion Des Comptes</div>
           <div className="usersSub">
-            Connecté : <b>{me?.email || me?.username || "—"}</b> ({me?.role || "—"})
+            Connecté : <b>{username}</b> (roles: <b>{roles.join(", ") || "—"}</b>)
           </div>
         </div>
 
@@ -173,19 +205,22 @@ export default function Users() {
             <tr>
               <th>USERNAME</th>
               <th>EMAIL</th>
-              <th>ROLE</th>
+              <th>ROLE(S)</th>
               <th>ENABLED</th>
               <th className="right">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => {
-              const role = u.role?.name ? u.role.name : u.role; // enum ou string
+              const rolesDisplay = Array.isArray(u.roles)
+                ? u.roles.join(", ")
+                : (u.role?.name || u.role || "—");
+
               return (
                 <tr key={u.id}>
                   <td>{u.username}</td>
                   <td>{u.email}</td>
-                  <td>{role}</td>
+                  <td>{rolesDisplay}</td>
                   <td>{u.enabled ? "Yes" : "No"}</td>
                   <td className="right">
                     {isAdmin ? (
@@ -221,7 +256,9 @@ export default function Users() {
           <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
             <div className="modalHead">
               <div className="modalTitle">{mode === "add" ? "Ajouter" : "Modifier"} un utilisateur</div>
-              <button className="iconBtn" onClick={() => setOpen(false)}>✕</button>
+              <button className="iconBtn" onClick={() => setOpen(false)}>
+                ✕
+              </button>
             </div>
 
             <div className="modalBody">
@@ -279,7 +316,9 @@ export default function Users() {
             </div>
 
             <div className="modalFoot">
-              <button className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>
+              <button className="btn ghost" onClick={() => setOpen(false)}>
+                Cancel
+              </button>
               <button className="btn primary" onClick={submit} disabled={loading}>
                 {mode === "add" ? "Créer" : "Enregistrer"}
               </button>

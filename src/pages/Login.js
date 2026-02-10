@@ -1,82 +1,115 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { api } from "../services/api"; // adapte si ton fichier s'appelle autrement
-
-import "./Auth.css"; // si tu n’as pas ce fichier, supprime cette ligne
+import { useNavigate } from "react-router-dom";
+import { api } from "../api/http";
 
 export default function Login() {
-  const navigate = useNavigate();
-
-  const [email, setEmail] = useState("");
+  const nav = useNavigate();
+  const [email, setEmail] = useState("");      // ✅ email
   const [password, setPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
+  const [error, setError] = useState("");
 
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    setErr("");
     setLoading(true);
+    setError("");
 
     try {
-      const res = await api.post("/auth/login", { email, password });
+      const res = await api("/api/auth/login", {
+        method: "POST",
+        body: { email: email.trim(), password }, // ✅ envoyer email
+      });
 
-      // res.data = { id, email, role }
-      localStorage.setItem("user", JSON.stringify(res.data));
+      // ✅ token
+      localStorage.setItem("token", res.token);
 
-      navigate("/solr-cluster");
-    } catch (e2) {
-      setErr("Email ou mot de passe incorrect.");
+      // ✅ user object (utilisé partout)
+      const user = {
+        id: res.id ?? null,
+        email: res.email ?? email.trim(),
+        username: res.username ?? null,
+        roles: res.roles ?? [],
+      };
+      localStorage.setItem("user", JSON.stringify(user));
+
+      // ✅ (optionnel) compat avec ton ancien code
+      localStorage.setItem("username", user.username || user.email);
+      localStorage.setItem("roles", JSON.stringify(user.roles));
+
+      nav("/solr-cluster", { replace: true });
+    } catch (err) {
+      setError(err.message || "Login failed");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-wrap">
-      <div className="auth-card">
-        <h1 className="auth-title">Login</h1>
+    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 20 }}>
+      <form
+        onSubmit={submit}
+        style={{
+          width: 360,
+          maxWidth: "100%",
+          border: "1px solid rgba(255,255,255,.08)",
+          background: "rgba(255,255,255,.03)",
+          borderRadius: 18,
+          padding: 18,
+        }}
+      >
+        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10 }}>Connexion</div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="field">
-            <div className="label">Email</div>
-            <input
-              className="input"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="ex: admin@solr.com"
-              required
-            />
-          </div>
+        <label style={{ display: "block", fontSize: 12, color: "rgba(234,242,255,.68)", marginTop: 10 }}>
+          Email
+        </label>
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          style={inpStyle}
+          placeholder="ghofrane@gmail.com"
+        />
 
-          <div className="field">
-            <div className="label">Password</div>
-            <input
-              className="input"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="•••••"
-              required
-            />
-          </div>
+        <label style={{ display: "block", fontSize: 12, color: "rgba(234,242,255,.68)", marginTop: 10 }}>
+          Password
+        </label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          style={inpStyle}
+        />
 
-          {err && <div className="err">{err}</div>}
+        {error && <div style={{ marginTop: 10, color: "#ffb4b4", fontSize: 13 }}>{error}</div>}
 
-          <div className="auth-actions">
-            <button className="primary" disabled={loading}>
-              {loading ? "Connexion..." : "Se connecter"}
-            </button>
-
-            <Link to="/register" style={{ textDecoration: "none" }}>
-              <button type="button" className="secondary">
-                Créer un compte
-              </button>
-            </Link>
-          </div>
-        </form>
-      </div>
+        <button disabled={loading} style={btnStyle}>
+          {loading ? "..." : "Login"}
+        </button>
+      </form>
     </div>
   );
 }
+
+const inpStyle = {
+  width: "100%",
+  marginTop: 6,
+  padding: "10px 12px",
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,.10)",
+  background: "rgba(10,16,30,.55)",
+  color: "#eaf2ff",
+  outline: "none",
+};
+
+const btnStyle = {
+  width: "100%",
+  marginTop: 14,
+  padding: "10px 12px",
+  borderRadius: 12,
+  border: "1px solid rgba(37,99,235,.35)",
+  background: "rgba(37,99,235,.22)",
+  color: "#eaf2ff",
+  cursor: "pointer",
+  fontWeight: 700,
+};

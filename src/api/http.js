@@ -13,7 +13,7 @@ export async function api(path, { method = "GET", body } = {}) {
   });
 
   const text = await res.text();
-  let data = null;
+  let data;
 
   try {
     data = text ? JSON.parse(text) : null;
@@ -22,8 +22,7 @@ export async function api(path, { method = "GET", body } = {}) {
   }
 
   if (!res.ok) {
-    const msg = typeof data === "string" ? data : (data?.message || `HTTP ${res.status}`);
-    throw new Error(msg);
+    throw new Error(data?.message || `HTTP ${res.status}`);
   }
 
   return data;
