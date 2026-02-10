@@ -11,3 +11,74 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+/* =========================
+   GLOBAL FORCE CONTRAST
+   ========================= */
+
+:root{
+  --darkText: #0f172a;
+  --mutedText: #475569;
+}
+
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+}
+
+/* ✅ Par défaut, dans la zone content, texte sombre */
+.content,
+.content *{
+  color: var(--darkText) !important;
+}
+
+/* ✅ Titres visibles */
+.content h1, .content h2, .content h3, .content h4{
+  color: var(--darkText) !important;
+}
+
+/* ✅ Sous-texte */
+.content .muted,
+.content .subtitle,
+.content .hint,
+.content small{
+  color: var(--mutedText) !important;
+}
+
+/* ✅ Cartes claires => texte sombre */
+.content .card,
+.content .panel,
+.content .box,
+.content .section,
+.content table,
+.content .table{
+  background: rgba(255,255,255,0.96) !important;
+  color: var(--darkText) !important;
+}
+
+/* ✅ Si tu as des blocks gris dans SolrCluster */
+.content .stat,
+.content .stat-card,
+.content .server-card,
+.content .solr-card{
+  background: rgba(255,255,255,0.92) !important;
+  color: var(--darkText) !important;
+}
+
+/* ✅ Form inputs lisibles */
+.content input,
+.content select,
+.content textarea{
+  color: var(--darkText) !important;
+}
+
+/* ✅ badges UP/DOWN */
+.badge-up{
+  background:#dcfce7 !important;
+  border:1px solid #86efac !important;
+  color:#166534 !important;
+}
+.badge-down{
+  background:#fee2e2 !important;
+  border:1px solid #fecaca !important;
+  color:#991b1b !important;
+}

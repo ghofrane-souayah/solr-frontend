@@ -21,6 +21,9 @@ export default function SolrServerDetails() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // ✅ collapse cores
+  const [openCores, setOpenCores] = useState(false);
+
   const load = async () => {
     setLoading(true);
     setError("");
@@ -50,6 +53,9 @@ export default function SolrServerDetails() {
   if (loading) return <div className="page notice">⏳ Chargement…</div>;
   if (error) return <div className="page notice error">❌ {error}</div>;
   if (!details) return null;
+
+  const cores = Array.isArray(details.cores) ? details.cores : [];
+  const hasCores = cores.length > 0;
 
   return (
     <div className="page">
@@ -103,52 +109,65 @@ export default function SolrServerDetails() {
         </div>
       )}
 
-      {/* CORES */}
+      {/* CORES (✅ PRO COLLAPSE) */}
       <div className="card">
-        <h2 className="sectionTitle">Cores</h2>
+        <button
+          type="button"
+          className={`coresHeaderBtn ${openCores ? "open" : ""}`}
+          onClick={() => hasCores && setOpenCores((v) => !v)}
+          disabled={!hasCores}
+          aria-expanded={openCores}
+          aria-controls="cores-panel-details"
+          title={!hasCores ? "Aucun core" : "Afficher / masquer"}
+        >
+          <div className="coresHeaderLeft">
+            <span className="coresTitle">Cores</span>
+            <span className="coresBadge">{cores.length}</span>
+            {!hasCores ? <span className="coresHintInline">Aucun core</span> : null}
+          </div>
 
-        {!Array.isArray(details.cores) || details.cores.length === 0 ? (
-          <div className="notice warn">⚠️ Aucun core</div>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Docs</th>
-                <th>Deleted</th>
-                <th>Size</th>
-              </tr>
-            </thead>
-            <tbody>
-              {details.cores.map((c) => (
-                <tr key={c.name}>
-                  <td className="mono">
-                    {/* ✅ Link du core (c est défini ici) */}
-                    <Link
-                      to={`/solr/server/${name}/schema/${c.name}`}
-                      className="coreLink"
-                    > 
-                    <td>
-  <Link
-    to={`/solr/server/${name}/schema/${c.name}`}
-    className="coreLink"
-  >
-    {c.name}
-  </Link>
-</td>
+          <span className={`chev ${openCores ? "rot" : ""}`}>▾</span>
+        </button>
 
-                      {c.name}
-                    </Link>
-                  </td>
-                  <td>{c.numDocs ?? 0}</td>
-                  <td>{c.deletedDocs ?? 0}</td>
-                  <td>{c.sizeInBytes ?? 0} bytes</td>
-                </tr>
-                
-              ))}
-            </tbody>
-          </table>
-        )}
+        <div id="cores-panel-details" className={`collapse ${openCores ? "open" : ""}`}>
+          <div className="collapseInner">
+            {!hasCores ? (
+              <div className="notice warn">⚠️ Aucun core</div>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Docs</th>
+                    <th>Deleted</th>
+                    <th>Size</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cores.map((c) => (
+                    <tr key={c.name}>
+                      <td className="mono">
+                        {/* ✅ FIX: route schema correcte */}
+                        <Link
+                          to={`/solr/schema/${name}/${c.name}`}
+                          className="coreLink"
+                          title={`Open schema for ${c.name}`}
+                        >
+                          {c.name}
+                        </Link>
+                      </td>
+                      <td>{c.numDocs ?? 0}</td>
+                      <td>{c.deletedDocs ?? 0}</td>
+                      <td>{formatBytes(c.sizeInBytes ?? 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {!openCores && hasCores ? <div className="muted" style={{ marginTop: 10 }} /> : null}
       </div>
     </div>
   );
@@ -164,4 +183,16 @@ function Info({ label, value, mono }) {
       <div className={`value ${mono ? "mono" : ""}`}>{value}</div>
     </div>
   );
+}
+
+/** Utils */
+function formatBytes(bytes) {
+  const b = Number(bytes) || 0;
+  if (b < 1024) return `${b} B`;
+  const kb = b / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  const gb = mb / 1024;
+  return `${gb.toFixed(2)} GB`;
 }

@@ -1,153 +1,534 @@
-.page {
-  padding: 30px;
-  color: #e6edf3;
-  background: radial-gradient(circle at top, #0b2a3c, #061a25);
+/* =========================
+   SolrServerDetails.css — BLUE PRO (FULL)
+   Background/cards/table = BLUE
+   Text/values/labels = GRAY PRO
+   No white anywhere
+   ========================= */
+
+:root{
+  /* page blue */
+  --bgTop: #0a1628;
+  --bgMid: #0b1d35;
+  --bgBot: #081427;
+
+  /* surfaces (blue, not gray/white) */
+  --cardTop: rgba(15,35,65,0.88);
+  --cardBot: rgba(10,25,45,0.88);
+  --boxTop:  rgba(12,30,55,0.90);
+  --boxBot:  rgba(9,22,40,0.90);
+
+  --border: rgba(255,255,255,0.10);
+  --border2: rgba(255,255,255,0.08);
+
+  /* text (gray pro) */
+  --tStrong: #e2e8f0;              /* titles */
+  --t: #c7d2e0;                    /* values */
+  --tMuted: rgba(199,210,224,0.68);/* labels */
+  --tMuted2: rgba(199,210,224,0.48);
+
+  /* links */
+  --link: #9fb4d8;
+  --linkHover: #b6c7e6;
+
+  /* status */
+  --statusBg: rgba(255,255,255,0.10);
+  --statusBorder: rgba(255,255,255,0.18);
+
+  --shadow: 0 18px 60px rgba(0,0,0,0.45);
+  --shadow2: 0 10px 30px rgba(0,0,0,0.30);
+
+  --r: 22px;
+  --r2: 18px;
+}
+
+*{ box-sizing: border-box; }
+html, body{ margin:0; padding:0; }
+
+/* =========================
+   PAGE (your JSX: className="page")
+   ========================= */
+.page{
   min-height: 100vh;
+  padding: 26px 28px 40px;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+
+  color: var(--t);
+  background:
+    radial-gradient(1100px 720px at 14% 12%, rgba(108,182,255,0.18), transparent 62%),
+    radial-gradient(900px 640px at 82% 26%, rgba(47,129,255,0.12), transparent 58%),
+    linear-gradient(180deg, var(--bgTop) 0%, var(--bgMid) 55%, var(--bgBot) 100%);
 }
 
-/* Header */
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
+/* =========================
+   HEADER (header/title/actions)
+   ========================= */
+.header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom: 18px;
 }
 
-.title {
-  font-size: 28px;
-  font-weight: 700;
+.title{
+  margin:0;
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: -0.4px;
+  color: var(--tStrong);
 }
 
-.actions {
-  display: flex;
-  gap: 12px;
+.actions{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
 }
 
-.btn {
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: none;
-  background: #0d3b56;
-  color: #e6edf3;
-  cursor: pointer;
-  font-weight: 600;
-}
+/* Buttons (keep your layout, blue pro) */
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
 
-.btn:hover {
-  background: #145374;
-}
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor:pointer;
+  font-weight: 900;
+  font-size: 13px;
 
-.btn.link {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.06);
+  color: var(--tStrong);
+  text-decoration:none;
+  transition: .18s ease;
+}
+.btn:hover{ background: rgba(255,255,255,0.09); }
+.btn:active{ transform: translateY(1px); }
+
+.btn.link{
   background: transparent;
-  border: 1px solid #2b5165;
-  text-decoration: none;
+  border-color: rgba(255,255,255,0.08);
+  color: var(--link);
+}
+.btn.link:hover{
+  color: var(--linkHover);
+  background: rgba(255,255,255,0.05);
 }
 
-/* Cards */
-.card {
-  background: linear-gradient(180deg, #0f2e3f, #0b2433);
-  border-radius: 14px;
-  padding: 20px;
-  margin-bottom: 20px;
-  border: 1px solid #16384d;
+/* Make first button (Refresh) a bit more "primary" */
+.actions .btn:first-child{
+  border-color: rgba(255,255,255,0.14);
+  background: rgba(47,129,255,0.18);
+}
+.actions .btn:first-child:hover{
+  background: rgba(47,129,255,0.24);
 }
 
-.sectionTitle {
-  margin-bottom: 15px;
+/* =========================
+   CARDS (className="card")
+   ========================= */
+.card{
+  margin-top: 16px;
+  padding: 18px;
+  border-radius: var(--r);
+
+  background: linear-gradient(180deg, var(--cardTop), var(--cardBot));
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+}
+
+/* Section title */
+.sectionTitle{
+  margin: 0 0 14px;
   font-size: 18px;
+  font-weight: 900;
+  color: var(--tStrong);
 }
 
-/* Grid infos */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+/* =========================
+   INFO GRID (className="grid")
+   ========================= */
+.grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 900px){
+  .grid{ grid-template-columns: 1fr; }
 }
 
-.info {
-  background: #0c2533;
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid #183c52;
+/* Each info box (className="info") */
+.info{
+  border-radius: var(--r2);
+  padding: 14px 16px;
+
+  background: linear-gradient(180deg, var(--boxTop), var(--boxBot));
+  border: 1px solid var(--border2);
+  box-shadow: var(--shadow2);
 }
 
-.label {
+/* label/value */
+.label{
   font-size: 12px;
-  opacity: 0.7;
+  letter-spacing: .3px;
+  color: var(--tMuted);
+}
+.value{
+  margin-top: 8px;
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--t);
+  word-break: break-word;
 }
 
-.value {
-  margin-top: 6px;
-  font-weight: 600;
-}
+/* =========================
+   STATUS (UP/DOWN) — keep background blue, text gray
+   ========================= */
+.status{
+  display:inline-flex;
+  align-items:center;
+  padding: 6px 12px;
+  border-radius: 999px;
 
-.mono {
-  font-family: monospace;
-}
-
-/* Status */
-.status {
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-weight: 700;
   font-size: 12px;
+  font-weight: 900;
+
+  background: var(--statusBg);
+  border: 1px solid var(--statusBorder);
+  color: var(--t);
 }
 
-.status.up {
-  background: #123f2f;
-  color: #2ee88c;
+/* If you still want slight difference without green/red */
+.status.up,
+.status.down{
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.18);
+  color: var(--t);
 }
 
-.status.down {
-  background: #3d1b1b;
-  color: #ff6b6b;
+/* =========================
+   HEALTH (className="health")
+   ========================= */
+.health{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+  color: var(--t);
+  font-weight: 800;
 }
 
-/* Health */
-.health {
-  display: flex;
-  gap: 15px;
-  align-items: center;
+/* =========================
+   CORES COLLAPSE UI
+   ========================= */
+.coresHeaderBtn{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--tStrong);
+  cursor:pointer;
+}
+.coresHeaderBtn:disabled{
+  opacity: .55;
+  cursor: not-allowed;
 }
 
-/* Table */
-.table {
-  width: 100%;
+.coresHeaderLeft{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+}
+
+.coresTitle{
+  font-weight: 900;
+  font-size: 18px;
+  color: var(--tStrong);
+}
+
+.coresBadge{
+  min-width: 28px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  font-size: 12px;
+  font-weight: 900;
+
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.08);
+  color: var(--t);
+}
+
+.coresHintInline{
+  font-size: 12px;
+  color: var(--tMuted);
+}
+
+.chev{
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+  transition: transform .2s ease;
+
+  color: var(--t);
+}
+.chev.rot{ transform: rotate(180deg); }
+
+.collapse{
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .25s ease;
+}
+.collapse.open{ max-height: 900px; }
+.collapseInner{ padding-top: 10px; }
+
+/* =========================
+   TABLE (className="table") — BLUE BACKGROUND
+   ========================= */
+.table{
+  width:100%;
   border-collapse: collapse;
+  min-width: 560px;
+
+  border-radius: 18px;
+  overflow:hidden;
+
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--boxTop), var(--boxBot));
+  box-shadow: var(--shadow2);
 }
 
-.table th,
-.table td {
-  padding: 10px;
-  border-bottom: 1px solid #1e4b63;
-  text-align: left;
+.table thead th{
+  padding: 14px 16px;
+  text-align:left;
+
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+
+  color: var(--tMuted);
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
-.table th {
-  opacity: 0.7;
+.table tbody td{
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--t);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
-/* Notices */
-.notice {
-  padding: 12px;
-  border-radius: 10px;
-  background: #16384d;
-}
+.table tbody tr:last-child td{ border-bottom: none; }
+.table tbody tr:hover td{ background: rgba(255,255,255,0.04); }
 
-.notice.warn {
-  background: #3a2e0b;
-  color: #ffdd57;
+/* Core link */
+.coreLink{
+  color: var(--link);
+  text-decoration:none;
+  font-weight: 900;
 }
-
-.notice.error {
-  background: #3b1616;
-  color: #ff6b6b;
-}
-.coreLink {
-  color: #7cdcff;
-  text-decoration: none;
-  font-weight: 700;
-}
-.coreLink:hover {
+.coreLink:hover{
+  color: var(--linkHover);
   text-decoration: underline;
+}
+
+/* Notice blocks (loading / errors / warn) */
+.notice{
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.06);
+  color: var(--t);
+}
+.notice.error{
+  border-color: rgba(255,84,106,0.25);
+  background: rgba(255,84,106,0.10);
+}
+.notice.warn{
+  border-color: rgba(245,158,11,0.25);
+  background: rgba(245,158,11,0.10);
+}
+
+/* Muted helper */
+.muted{
+  color: var(--tMuted);
+  font-size: 13px;
+}
+
+/* =========================
+   HARD KILL WHITE/BLACK from other CSS
+   ========================= */
+.page *{
+  color: inherit;
+}
+.page input,
+.page select,
+.page textarea{
+  color: var(--t) !important;
+}
+.page input::placeholder{
+  color: var(--tMuted2) !important;
+}
+/* ======================================
+   FIX CORES TABLE: make names visible + pro table
+   ====================================== */
+
+/* 1) wrapper/table must NOT become white */
+.page .table{
+  background: linear-gradient(180deg, rgba(12,30,55,0.92), rgba(9,22,40,0.92)) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  overflow: hidden;
+}
+
+/* 2) the white area comes from tbody/td -> force dark */
+.page .table tbody,
+.page .table tbody tr,
+.page .table tbody td{
+  background: transparent !important;
+}
+
+/* Zebra (pro touch) */
+.page .table tbody tr:nth-child(even) td{
+  background: rgba(255,255,255,0.03) !important;
+}
+.page .table tbody tr:hover td{
+  background: rgba(108,182,255,0.10) !important;
+}
+
+/* 3) Text colors inside table */
+.page .table tbody td{
+  color: #c7d2e0 !important; /* gray pro visible */
+}
+
+/* 4) Header stays clean */
+.page .table thead th{
+  background: rgba(255,255,255,0.05) !important;
+  color: rgba(199,210,224,0.75) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.10) !important;
+}
+
+/* 5) Core name link (the important part) */
+.page .coreLink{
+  color: #c7d2e0 !important;      /* visible */
+  font-weight: 900;
+  text-decoration: none;
+}
+.page .coreLink:hover{
+  color: #e2e8f0 !important;
+  text-decoration: underline;
+}
+
+/* 6) Ensure mono text also visible */
+.page .table .mono{
+  color: #c7d2e0 !important;
+}
+/* ======================================
+   PRO TOUCH (SUBTLE) — without changing your design
+   ====================================== */
+
+/* 1) Header underline (premium separator) */
+.page .header{
+  position: relative;
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+}
+.page .header::after{
+  content:"";
+  position:absolute;
+  left:0; right:0; bottom:0;
+  height:1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(108,182,255,0.22),
+    rgba(255,255,255,0.10),
+    rgba(108,182,255,0.22),
+    transparent
+  );
+}
+
+/* 2) Cards: slight top highlight (glass pro) */
+.page .card{
+  position: relative;
+  overflow: hidden;
+}
+.page .card::before{
+  content:"";
+  position:absolute;
+  inset:-1px;
+  pointer-events:none;
+  background:
+    radial-gradient(900px 220px at 20% 0%, rgba(108,182,255,0.16), transparent 55%),
+    radial-gradient(700px 180px at 85% 0%, rgba(47,129,255,0.12), transparent 55%);
+  opacity: .55;
+}
+
+/* 3) “Informations / Health / Cores” titles: small left accent bar */
+.page .sectionTitle{
+  position: relative;
+  padding-left: 12px;
+}
+.page .sectionTitle::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(108,182,255,0.55);
+}
+
+/* 4) Info boxes: micro hover to feel interactive */
+.page .info{
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+.page .info:hover{
+  transform: translateY(-2px);
+  border-color: rgba(108,182,255,0.22);
+  background: linear-gradient(180deg, rgba(12,30,55,0.94), rgba(9,22,40,0.94));
+}
+
+/* 5) Buttons: cleaner focus ring (pro accessibility) */
+.page .btn:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(108,182,255,0.20);
+  border-color: rgba(108,182,255,0.32);
+}
+
+/* 6) Status chip: tiny gloss */
+.page .status{
+  position: relative;
+  overflow: hidden;
+}
+.page .status::after{
+  content:"";
+  position:absolute;
+  left:-30%;
+  top:-80%;
+  width: 90%;
+  height: 220%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.20), transparent);
+  transform: rotate(18deg);
+  opacity: .20;
 }

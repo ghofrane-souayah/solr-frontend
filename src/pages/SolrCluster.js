@@ -11,6 +11,11 @@ export default function SolrCluster() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // ✅ Accordion state: open/close per server
+  const [openCores, setOpenCores] = useState({});
+  const toggleCores = (serverName) =>
+    setOpenCores((prev) => ({ ...prev, [serverName]: !prev[serverName] }));
+
   const load = async () => {
     setError("");
     setLoading(true);
@@ -21,7 +26,9 @@ export default function SolrCluster() {
       setData(json);
     } catch (e) {
       console.error(e);
-      setError("Erreur lors du chargement des serveurs Solr (backend down ? CORS ? URL ?)");
+      setError(
+        "Erreur lors du chargement des serveurs Solr (backend down ? CORS ? URL ?)"
+      );
     } finally {
       setLoading(false);
     }
@@ -85,7 +92,7 @@ export default function SolrCluster() {
 
       {/* ✅ PRO LAYOUT: sidebar + main */}
       <div className="layout">
-        {/* LEFT: OVERVIEW (petit) */}
+        {/* LEFT: OVERVIEW */}
         <aside className="side">
           <div className="card cardCompact">
             <div className="cardTitle">Cluster Overview</div>
@@ -161,89 +168,128 @@ export default function SolrCluster() {
             )}
 
             <div className="serverList">
-              {filteredServers.map((s) => (
-                <div key={s.name} className="serverCard">
-                  <div className="serverTop">
-                    <div className="serverName">
-                      {/* ✅ cliquable */}
-                      <Link
-                        to={`/solr/server/${s.name}`}
-                        className="serverLink"
-                        title={`Open ${s.name} details`}
-                      >
-                        {s.name}
-                      </Link>{" "}
-                      —{" "}
-                      <span className={`status ${s.status === "UP" ? "up" : "down"}`}>
-                        {s.status}
-                      </span>
+              {filteredServers.map((s) => {
+                const cores = Array.isArray(s.cores) ? s.cores : [];
+                const hasCores = cores.length > 0;
+                const isOpen = !!openCores[s.name];
+                const panelId = `cores-panel-${s.name}`;
+
+                return (
+                  <div key={s.name} className="serverCard">
+                    <div className="serverTop">
+                      <div className="serverName">
+                        <Link
+                          to={`/solr/server/${s.name}`}
+                          className="serverLink"
+                          title={`Open ${s.name} details`}
+                        >
+                          {s.name}
+                        </Link>{" "}
+                        —{" "}
+                        <span
+                          className={`status ${
+                            s.status === "UP" ? "up" : "down"
+                          }`}
+                        >
+                          {s.status}
+                        </span>
+                      </div>
+
+                      <div className="serverAddr mono">
+                        {s.host}:{s.port}
+                      </div>
                     </div>
 
-                    <div className="serverAddr mono">
-                      {s.host}:{s.port}
+                    <div className="metricsRow">
+                      <div className={`metric ${pctColor(s.cpu)}`}>
+                        <div className="metricLabel">CPU</div>
+                        <div className="metricValue">{Number(s.cpu) || 0}%</div>
+                      </div>
+
+                      <div className={`metric ${pctColor(s.memory)}`}>
+                        <div className="metricLabel">Memory</div>
+                        <div className="metricValue">
+                          {Number(s.memory) || 0}%
+                        </div>
+                      </div>
+
+                      <div className="metric">
+                        <div className="metricLabel">Total docs</div>
+                        <div className="metricValue">{s.totalDocs ?? 0}</div>
+                      </div>
+
+                      <div className="metric">
+                        <div className="metricLabel">Total size</div>
+                        <div className="metricValue">
+                          {formatBytes(s.totalSizeInBytes ?? 0)}
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="metricsRow">
-                    <div className={`metric ${pctColor(s.cpu)}`}>
-                      <div className="metricLabel">CPU</div>
-                      <div className="metricValue">{Number(s.cpu) || 0}%</div>
-                    </div>
-
-                    <div className={`metric ${pctColor(s.memory)}`}>
-                      <div className="metricLabel">Memory</div>
-                      <div className="metricValue">{Number(s.memory) || 0}%</div>
-                    </div>
-
-                    <div className="metric">
-                      <div className="metricLabel">Total docs</div>
-                      <div className="metricValue">{s.totalDocs ?? 0}</div>
-                    </div>
-
-                    <div className="metric">
-                      <div className="metricLabel">Total size</div>
-                      <div className="metricValue">{formatBytes(s.totalSizeInBytes ?? 0)}</div>
-                    </div>
-                  </div>
-
-                  {Array.isArray(s.alerts) && s.alerts.length > 0 && (
-                    <div className="notice warn">⚠️ Alerts: {s.alerts.join(", ")}</div>
-                  )}
-
-                  {s.error && <div className="notice error">❌ {s.error}</div>}
-
-                  <div className="coresBlock">
-                    <div className="coresTitle">Cores</div>
-
-                    {!Array.isArray(s.cores) || s.cores.length === 0 ? (
-                      <div className="muted">Aucun core</div>
-                    ) : (
-                      <div className="coresTableWrap">
-                        <table className="coresTable">
-                          <thead>
-                            <tr>
-                              <th>Name</th>
-                              <th>Docs</th>
-                              <th>Deleted</th>
-                              <th>Size</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {s.cores.map((c) => (
-                              <tr key={c.name}>
-                                <td className="mono">{c.name}</td>
-                                <td>{c.numDocs ?? 0}</td>
-                                <td>{c.deletedDocs ?? 0}</td>
-                                <td>{formatBytes(c.sizeInBytes ?? 0)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                    {Array.isArray(s.alerts) && s.alerts.length > 0 && (
+                      <div className="notice warn">
+                        ⚠️ Alerts: {s.alerts.join(", ")}
                       </div>
                     )}
+
+                    {s.error && <div className="notice error">❌ {s.error}</div>}
+
+                    {/* ✅ PRO ACCORDION FOR CORES */}
+                    <div className="coresBlock">
+                      <button
+                        type="button"
+                        className={`coresHeaderBtn ${isOpen ? "open" : ""}`}
+                        onClick={() => hasCores && toggleCores(s.name)}
+                        disabled={!hasCores}
+                        aria-expanded={isOpen}
+                        aria-controls={panelId}
+                        title={!hasCores ? "Aucun core" : "Afficher / masquer"}
+                      >
+                        <div className="coresHeaderLeft">
+                          <span className="coresTitle">Cores</span>
+                          <span className="coresBadge">{cores.length}</span>
+                          {!hasCores ? (
+                            <span className="coresHintInline">Aucun core</span>
+                          ) : null}
+                        </div>
+
+                        <span className={`chev ${isOpen ? "rot" : ""}`}>▾</span>
+                      </button>
+
+                      <div
+                        id={panelId}
+                        className={`collapse ${isOpen ? "open" : ""}`}
+                      >
+                        <div className="collapseInner">
+                          <div className="coresTableWrap">
+                            <table className="coresTable">
+                              <thead>
+                                <tr>
+                                  <th>Name</th>
+                                  <th>Docs</th>
+                                  <th>Deleted</th>
+                                  <th>Size</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {cores.map((c) => (
+                                  <tr key={c.name}>
+                                    <td className="mono">{c.name}</td>
+                                    <td>{c.numDocs ?? 0}</td>
+                                    <td>{c.deletedDocs ?? 0}</td>
+                                    <td>{formatBytes(c.sizeInBytes ?? 0)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* ✅ END CORES */}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>

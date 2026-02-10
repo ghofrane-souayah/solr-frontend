@@ -1,262 +1,396 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import "./SolrSchema.css";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
-const API = "http://localhost:8081/api/solr/servers";
+const API_BASE = "http://localhost:8081/api/solr";
 
 export default function SolrSchema() {
-  const { name, core } = useParams();
+  const { name: serverName, core } = useParams();
+  const nav = useNavigate();
+
+  const [activeTab, setActiveTab] = useState("fields"); // fields | types | dynamic
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const [fields, setFields] = useState([]);
   const [types, setTypes] = useState([]);
   const [dynamicFields, setDynamicFields] = useState([]);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
 
-  const [tab, setTab] = useState("FIELDS"); // FIELDS | TYPES | DYNAMIC
-  const [q, setQ] = useState("");
+  // ✅ NEW: show/hide table for "fields"
+  const [showTable, setShowTable] = useState(true);
 
-  const load = async () => {
+  const filteredFields = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return fields;
+    return fields.filter(
+      (f) =>
+        (f.name || "").toLowerCase().includes(q) ||
+        (f.type || "").toLowerCase().includes(q)
+    );
+  }, [fields, search]);
+
+  const filteredTypes = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return types;
+    return types.filter((t) => (t || "").toLowerCase().includes(q));
+  }, [types, search]);
+
+  const filteredDynamic = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return dynamicFields;
+    return dynamicFields.filter((d) => (d || "").toLowerCase().includes(q));
+  }, [dynamicFields, search]);
+
+  async function fetchAll() {
     setLoading(true);
     setError("");
 
     try {
       const [fRes, tRes, dRes] = await Promise.all([
-        fetch(`${API}/${name}/cores/${core}/schema/fields`),
-        fetch(`${API}/${name}/cores/${core}/schema/types`),
-        fetch(`${API}/${name}/cores/${core}/schema/dynamic-fields`),
+        fetch(
+          `${API_BASE}/servers/${serverName}/collections/${core}/schema/fields`
+        ),
+        fetch(
+          `${API_BASE}/servers/${serverName}/collections/${core}/schema/fieldtypes`
+        ),
+        fetch(
+          `${API_BASE}/servers/${serverName}/collections/${core}/schema/dynamicfields`
+        ),
       ]);
 
-      if (!fRes.ok) throw new Error(`Fields HTTP ${fRes.status}`);
-      if (!tRes.ok) throw new Error(`Types HTTP ${tRes.status}`);
-      if (!dRes.ok) throw new Error(`Dynamic HTTP ${dRes.status}`);
+      if (!fRes.ok) throw new Error(`Fields error: ${fRes.status}`);
+      if (!tRes.ok) throw new Error(`Types error: ${tRes.status}`);
+      if (!dRes.ok) throw new Error(`Dynamic error: ${dRes.status}`);
 
-      const fJson = await fRes.json();
-      const tJson = await tRes.json();
-      const dJson = await dRes.json();
+      const fData = await fRes.json();
+      const tData = await tRes.json();
+      const dData = await dRes.json();
 
-      // ✅ on accepte plusieurs formats possibles
-      setFields(Array.isArray(fJson) ? fJson : fJson.fields || []);
-      setTypes(Array.isArray(tJson) ? tJson : tJson.fieldTypes || tJson.types || []);
-      setDynamicFields(Array.isArray(dJson) ? dJson : dJson.dynamicFields || []);
+      setFields(Array.isArray(fData) ? fData : []);
+      setTypes(Array.isArray(tData) ? tData : []);
+      setDynamicFields(Array.isArray(dData) ? dData : []);
     } catch (e) {
-      console.error(e);
-      setError(
-        "Impossible de charger le schema (endpoints backend manquants ? core introuvable ?)."
-      );
+      setError(e.message || "Erreur lors du chargement du schema");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   useEffect(() => {
-    load();
+    fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, core]);
+  }, [serverName, core]);
 
-  const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase();
-
-    const filterList = (arr, fieldsToSearch) => {
-      if (!query) return arr;
-      return arr.filter((x) => {
-        const hay = fieldsToSearch.map((k) => String(x?.[k] ?? "")).join(" ").toLowerCase();
-        return hay.includes(query);
-      });
-    };
-
-    if (tab === "FIELDS") return filterList(fields, ["name", "type"]);
-    if (tab === "TYPES") return filterList(types, ["name", "class"]);
-    return filterList(dynamicFields, ["name", "type"]);
-  }, [tab, q, fields, types, dynamicFields]);
+  // ✅ Optional: when changing tab, show table again
+  useEffect(() => {
+    if (activeTab === "fields") setShowTable(true);
+  }, [activeTab]);
 
   return (
-    <div className="schemaPage">
-      {/* HEADER */}
-      <div className="schemaHeader">
+    <div style={styles.page}>
+      <div style={styles.top}>
         <div>
-          <div className="schemaBreadcrumb">
-            <Link to="/solr-cluster" className="schemaLink">
-              Solr Cluster
-            </Link>
-            <span className="schemaSep">/</span>
-            <Link to={`/solr/server/${name}`} className="schemaLink">
-              {name}
-            </Link>
-            <span className="schemaSep">/</span>
-            <span className="schemaCore mono">{core}</span>
+          <div style={styles.breadcrumb}>
+            Solr Cluster / {serverName} / <b>{core}</b>
           </div>
-
-          <h1 className="schemaTitle">Schema</h1>
-          <div className="schemaSubtitle">
-            Server: <span className="mono">{name}</span> — Core:{" "}
-            <span className="mono">{core}</span>
+          <h1 style={styles.h1}>Schema</h1>
+          <div style={styles.sub}>
+            Server: <b>{serverName}</b> — Core: <b>{core}</b>
           </div>
         </div>
 
-        <div className="schemaActions">
-          <button className="btn primary" onClick={load} disabled={loading}>
-            {loading ? "Loading..." : "Refresh"}
+        <div style={styles.actions}>
+          <button style={styles.btn} onClick={fetchAll} disabled={loading}>
+            Refresh
           </button>
-          <Link className="btn" to={`/solr/server/${name}`}>
+          <button style={styles.btnGhost} onClick={() => nav(-1)}>
             ← Back
-          </Link>
+          </button>
         </div>
       </div>
 
-      {/* TOP BAR */}
-      <div className="schemaBar">
-        <div className="tabs">
-          <button
-            className={`tabBtn ${tab === "FIELDS" ? "active" : ""}`}
-            onClick={() => setTab("FIELDS")}
-          >
-            Fields <span className="badge">{fields.length}</span>
-          </button>
-
-          <button
-            className={`tabBtn ${tab === "TYPES" ? "active" : ""}`}
-            onClick={() => setTab("TYPES")}
-          >
-            Types <span className="badge">{types.length}</span>
-          </button>
-
-          <button
-            className={`tabBtn ${tab === "DYNAMIC" ? "active" : ""}`}
-            onClick={() => setTab("DYNAMIC")}
-          >
-            Dynamic <span className="badge">{dynamicFields.length}</span>
-          </button>
+      <div style={styles.tabsRow}>
+        <div style={styles.tabs}>
+          <Tab
+            label={`Fields (${fields.length})`}
+            active={activeTab === "fields"}
+            onClick={() => setActiveTab("fields")}
+          />
+          <Tab
+            label={`Types (${types.length})`}
+            active={activeTab === "types"}
+            onClick={() => setActiveTab("types")}
+          />
+          <Tab
+            label={`Dynamic (${dynamicFields.length})`}
+            active={activeTab === "dynamic"}
+            onClick={() => setActiveTab("dynamic")}
+          />
         </div>
 
         <input
-          className="search"
-          placeholder="Search (name / type / class)..."
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
+          style={styles.search}
+          placeholder="Search..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
-      {error && <div className="notice error">❌ {error}</div>}
-      {loading && <div className="notice">⏳ Chargement du schema...</div>}
+      {error ? <div style={styles.error}>{error}</div> : null}
 
-      {/* CONTENT */}
-      <div className="card">
-        {tab === "FIELDS" && <FieldsTable rows={filtered} />}
-        {tab === "TYPES" && <TypesTable rows={filtered} />}
-        {tab === "DYNAMIC" && <DynamicTable rows={filtered} />}
+      <div style={styles.card}>
+        {loading ? (
+          <div style={styles.loading}>Loading...</div>
+        ) : activeTab === "fields" ? (
+          <div>
+            <div style={styles.sectionHeader}>
+              <h2 style={styles.sectionTitle}>Fields</h2>
+
+              <button
+                style={styles.toggleBtn}
+                onClick={() => setShowTable((v) => !v)}
+              >
+                {showTable ? "Hide table ▲" : "Show table ▼"}
+              </button>
+            </div>
+
+            {showTable ? (
+              <FieldsTable data={filteredFields} />
+            ) : (
+              <div style={styles.loading}>Table hidden.</div>
+            )}
+          </div>
+        ) : activeTab === "types" ? (
+          <Pills title="Field Types" items={filteredTypes} />
+        ) : (
+          <Pills title="Dynamic Fields" items={filteredDynamic} />
+        )}
       </div>
     </div>
   );
 }
 
-/* ===========================
-   TABLES
-=========================== */
-
-function FieldsTable({ rows }) {
-  if (!rows || rows.length === 0) return <Empty text="Aucun field." />;
-
+function Tab({ label, active, onClick }) {
   return (
-    <>
-      <div className="cardTitle">Fields</div>
-      <table className="table">
+    <button
+      onClick={onClick}
+      style={{
+        ...styles.tab,
+        ...(active ? styles.tabActive : {}),
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function FieldsTable({ data }) {
+  return (
+    <div style={styles.tableWrap}>
+      <table style={styles.table}>
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Stored</th>
-            <th>Indexed</th>
-            <th>MultiValued</th>
-            <th>Required</th>
+            <th style={styles.th}>Name</th>
+            <th style={styles.th}>Type</th>
+            <th style={styles.thCenter}>Stored</th>
+            <th style={styles.thCenter}>Indexed</th>
+            <th style={styles.thCenter}>MultiValued</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((f) => (
+          {data.map((f) => (
             <tr key={f.name}>
-              <td className="mono">{f.name}</td>
-              <td>
-                <span className="chip">{f.type || "-"}</span>
+              <td style={styles.td}>{f.name}</td>
+              <td style={styles.td}>
+                <span style={styles.badge}>{f.type}</span>
               </td>
-              <td>{bool(f.stored)}</td>
-              <td>{bool(f.indexed)}</td>
-              <td>{bool(f.multiValued)}</td>
-              <td>{bool(f.required)}</td>
+              <td style={styles.tdCenter}>{f.stored ? "✓" : "—"}</td>
+              <td style={styles.tdCenter}>{f.indexed ? "✓" : "—"}</td>
+              <td style={styles.tdCenter}>{f.multiValued ? "✓" : "—"}</td>
             </tr>
           ))}
-        </tbody>
-      </table>
-    </>
-  );
-}
-
-function TypesTable({ rows }) {
-  if (!rows || rows.length === 0) return <Empty text="Aucun type." />;
-
-  return (
-    <>
-      <div className="cardTitle">Types</div>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Class</th>
-            <th>Analyzer</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((t) => (
-            <tr key={t.name}>
-              <td className="mono">{t.name}</td>
-              <td className="mono">{t.class || t.className || "-"}</td>
-              <td>{t.analyzer ? "✅" : "-"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </>
-  );
-}
-
-function DynamicTable({ rows }) {
-  if (!rows || rows.length === 0) return <Empty text="Aucun dynamic field." />;
-
-  return (
-    <>
-      <div className="cardTitle">Dynamic Fields</div>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Stored</th>
-            <th>Indexed</th>
-            <th>MultiValued</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((d) => (
-            <tr key={d.name}>
-              <td className="mono">{d.name}</td>
-              <td>
-                <span className="chip">{d.type || "-"}</span>
+          {data.length === 0 ? (
+            <tr>
+              <td style={styles.empty} colSpan={5}>
+                Aucun champ trouvé.
               </td>
-              <td>{bool(d.stored)}</td>
-              <td>{bool(d.indexed)}</td>
-              <td>{bool(d.multiValued)}</td>
             </tr>
-          ))}
+          ) : null}
         </tbody>
       </table>
-    </>
+    </div>
   );
 }
 
-function Empty({ text }) {
-  return <div className="notice warn">⚠️ {text}</div>;
+function Pills({ title, items }) {
+  return (
+    <div>
+      <h2 style={styles.sectionTitle}>{title}</h2>
+      <div style={styles.pills}>
+        {items.map((x) => (
+          <span key={x} style={styles.pill}>
+            {x}
+          </span>
+        ))}
+        {items.length === 0 ? (
+          <div style={styles.loading}>Aucun élément.</div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
-function bool(v) {
-  return v === true ? "✅" : "—";
-}
+const styles = {
+  page: {
+    minHeight: "100vh",
+    background: "linear-gradient(180deg, #0b1220 0%, #060a12 100%)",
+    color: "#e8eefc",
+    padding: 24,
+    fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial",
+  },
+  top: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
+    marginBottom: 18,
+  },
+  breadcrumb: { opacity: 0.8, fontSize: 14, marginBottom: 8 },
+  h1: { margin: 0, fontSize: 44, letterSpacing: -0.5 },
+  sub: { opacity: 0.8, marginTop: 6 },
+  actions: { display: "flex", gap: 10 },
+  btn: {
+    background: "#1d4ed8",
+    border: "1px solid #2b5cff",
+    color: "white",
+    padding: "10px 14px",
+    borderRadius: 10,
+    cursor: "pointer",
+    fontWeight: 600,
+  },
+  btnGhost: {
+    background: "transparent",
+    border: "1px solid rgba(255,255,255,0.18)",
+    color: "white",
+    padding: "10px 14px",
+    borderRadius: 10,
+    cursor: "pointer",
+    fontWeight: 600,
+  },
+  tabsRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 16,
+  },
+  tabs: { display: "flex", gap: 10 },
+  tab: {
+    background: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    color: "white",
+    padding: "10px 14px",
+    borderRadius: 999,
+    cursor: "pointer",
+    fontWeight: 700,
+  },
+  tabActive: {
+    background: "#1d4ed8",
+    borderColor: "#2b5cff",
+  },
+  search: {
+    width: 320,
+    maxWidth: "55vw",
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.16)",
+    background: "rgba(255,255,255,0.05)",
+    color: "white",
+    outline: "none",
+  },
+  card: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    background: "rgba(255,255,255,0.03)",
+    borderRadius: 18,
+    padding: 16,
+  },
+
+  // ✅ NEW: header row with toggle
+  sectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    margin: "6px 0 12px 0",
+  },
+  sectionTitle: { margin: 0, fontSize: 20 },
+  toggleBtn: {
+    background: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.14)",
+    color: "white",
+    padding: "10px 14px",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontWeight: 800,
+    whiteSpace: "nowrap",
+  },
+
+  tableWrap: {
+    overflowX: "auto",
+    borderRadius: 14,
+    border: "1px solid rgba(255,255,255,0.10)",
+  },
+  table: { width: "100%", borderCollapse: "collapse" },
+  th: {
+    textAlign: "left",
+    padding: 12,
+    fontSize: 13,
+    opacity: 0.85,
+    borderBottom: "1px solid rgba(255,255,255,0.10)",
+  },
+  thCenter: {
+    textAlign: "center",
+    padding: 12,
+    fontSize: 13,
+    opacity: 0.85,
+    borderBottom: "1px solid rgba(255,255,255,0.10)",
+  },
+  td: {
+    padding: 12,
+    borderBottom: "1px solid rgba(255,255,255,0.08)",
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  },
+  tdCenter: {
+    padding: 12,
+    textAlign: "center",
+    borderBottom: "1px solid rgba(255,255,255,0.08)",
+    fontWeight: 800,
+  },
+  badge: {
+    display: "inline-block",
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.14)",
+    fontSize: 12,
+  },
+  pills: { display: "flex", flexWrap: "wrap", gap: 10 },
+  pill: {
+    padding: "8px 12px",
+    borderRadius: 999,
+    border: "1px solid rgba(255,255,255,0.14)",
+    background: "rgba(255,255,255,0.05)",
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  },
+  error: {
+    padding: 12,
+    borderRadius: 12,
+    background: "rgba(239,68,68,0.12)",
+    border: "1px solid rgba(239,68,68,0.35)",
+    color: "#fecaca",
+    marginBottom: 14,
+  },
+  loading: { opacity: 0.85, padding: 10 },
+  empty: { padding: 16, opacity: 0.7 },
+};
