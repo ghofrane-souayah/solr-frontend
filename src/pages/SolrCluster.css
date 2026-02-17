@@ -1,585 +1,340 @@
-/* =========================
-   SolrCluster.css — BLUE PRO LOOK (FULL)
-   (same layout, same sizes, same shadows, NO GREEN)
-   ========================= */
+/* =============================
+   SolrCluster - Corporate Console
+   ============================= */
 
-:root{
-  /* background (blue professional) */
-  --bgTop: #0a1628;
-  --bgMid: #0b1d35;
-  --bgBot: #081427;
-
-  /* panels */
-  --panel: rgba(255,255,255,0.06);
-  --panel2: rgba(0,0,0,0.22);
-  --panel3: rgba(0,0,0,0.28);
-
-  --border: rgba(255,255,255,0.10);
-  --border2: rgba(255,255,255,0.08);
-
-  /* text */
-  --txt: #eaf2f7;
-  --muted: rgba(234,242,247,0.72);
-  --muted2: rgba(234,242,247,0.52);
-
-  /* accents (BLUE ONLY) */
-  --link: #6cb6ff;     /* links */
-  --blue: #2f81ff;     /* primary */
-  --up:   #4da3ff;     /* UP = blue */
-  --down: #ff546a;     /* DOWN = red */
-
-  --shadow: 0 18px 60px rgba(0,0,0,0.45);
-  --shadow2: 0 10px 30px rgba(0,0,0,0.30);
-}
-
-*{ box-sizing: border-box; }
-html, body { margin:0; padding:0; }
-
-/* Page wrapper */
 .solrPage{
-  min-height: 100vh;
-  padding: 26px 28px 40px;
-  color: var(--txt);
-  background:
-    radial-gradient(1100px 720px at 14% 12%, rgba(108,182,255,0.18), transparent 62%),
-    radial-gradient(900px 640px at 82% 26%, rgba(47,129,255,0.12), transparent 58%),
-    linear-gradient(180deg, var(--bgTop) 0%, var(--bgMid) 55%, var(--bgBot) 100%);
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 18px 18px 34px;
 }
 
-/* Header */
 .solrHeader{
   display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:16px;
-  margin-bottom: 18px;
-}
-.solrTitle{
-  margin:0;
-  font-size: 44px;
-  letter-spacing: -0.6px;
-  line-height: 1.05;
-  color: var(--txt);
-}
-.solrSubtitle{
-  margin-top: 8px;
-  font-size: 14px;
-  letter-spacing: 0.2px;
-  color: var(--muted);
-}
-.solrHeaderRight{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  flex-wrap:wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
-.pill{
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  border-radius: 999px;
-  padding: 10px 14px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.10);
-  backdrop-filter: blur(10px);
-  font-size: 13px;
-  color: rgba(234,242,247,0.90);
+.solrTitle{
+  font-size: 46px;
+  font-weight: 950;
+  margin: 0;
+  letter-spacing: .2px;
 }
+
+.solrSubtitle{
+  margin-top: 6px;
+  font-size: 13px;
+  opacity: .70;
+}
+
+.solrHeaderRight{
+  display:flex;
+  gap: 10px;
+  align-items:center;
+  flex-wrap: wrap;
+}
+
+.metaPill{
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  font-weight: 900;
+  font-size: 12px;
+  opacity: .9;
+}
+
 .mono{
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
-/* Layout grid */
-.grid{
-  display:grid;
-  grid-template-columns: 320px 1fr;
-  gap: 18px;
+.btn{
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: #eaf2ff;
+  cursor: pointer;
+  font-weight: 950;
 }
-@media (max-width: 1050px){
-  .grid{ grid-template-columns: 1fr; }
-}
-
-/* Big panel blocks */
-.card{
-  border-radius: 22px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(14px);
-  padding: 18px;
+.btn:disabled{ opacity:.55; cursor:not-allowed; }
+.btn.primary{
+  border-color: rgba(37,99,235,.35);
+  background: rgba(37,99,235,.22);
 }
 
-.cardTitle{
-  margin: 0 0 14px;
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: 0.2px;
-  color: var(--txt);
-}
-
-/* Overview KPIs (TOTAL/UP/DOWN) */
-.overviewGrid{
-  display:grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-}
-.kpi{
+/* Panels (corporate) */
+.panel{
   border-radius: 18px;
   padding: 16px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.26), rgba(0,0,0,0.18));
-  border: 1px solid var(--border2);
-  box-shadow: var(--shadow2);
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 24px 70px rgba(0,0,0,.35);
+  margin-top: 14px;
+}
+
+.panelTop{
+  display:flex;
+  justify-content: space-between;
+  align-items:flex-end;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.panelTitle{
+  font-weight: 950;
+  font-size: 16px;
+}
+.panelSub{
+  opacity:.72;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* KPI */
+.kpiGrid{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+@media (max-width: 900px){
+  .kpiGrid{ grid-template-columns: 1fr; }
+}
+
+.kpiCard{
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
 }
 .kpiLabel{
+  opacity:.75;
   font-size: 12px;
-  letter-spacing: 0.8px;
   text-transform: uppercase;
-  color: var(--muted2);
+  letter-spacing: .08em;
+  font-weight: 900;
 }
 .kpiValue{
-  margin-top: 10px;
-  font-size: 32px;
-  font-weight: 900;
-  letter-spacing: -0.4px;
-  color: var(--txt);
+  font-size: 34px;
+  font-weight: 950;
+  margin-top: 8px;
 }
-.kpi.good .kpiValue{ color: var(--up); }
-.kpi.bad  .kpiValue{ color: var(--down); }
+.kpiHint{
+  opacity:.65;
+  font-size: 12px;
+  margin-top: 4px;
+}
 
-/* Toolbar (ALL/UP/DOWN + search) */
-.toolbar{
+/* Toolbar */
+.tools{
   display:flex;
+  gap:10px;
   align-items:center;
-  gap: 12px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
+  flex-wrap: wrap;
 }
 
 .seg{
-  display:inline-flex;
+  display:flex;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(10,16,30,.55);
   border-radius: 999px;
-  padding: 5px;
-  background: rgba(0,0,0,0.26);
-  border: 1px solid rgba(255,255,255,0.10);
+  padding: 4px;
 }
-.segBtn{
-  border:none;
+.seg button{
+  border: none;
   background: transparent;
-  color: rgba(234,242,247,0.82);
-  padding: 9px 14px;
+  color: rgba(234,242,255,.75);
+  font-weight: 950;
+  padding: 8px 12px;
   border-radius: 999px;
   cursor:pointer;
-  font-weight: 900;
-  font-size: 13px;
 }
-.segBtn:hover{ background: rgba(255,255,255,0.06); }
-.segBtn.active{
-  background: rgba(47,129,255,0.26);
+.seg button.active{
+  background: rgba(37,99,235,.22);
+  border: 1px solid rgba(37,99,235,.35);
   color: #eaf2ff;
-  box-shadow: inset 0 0 0 1px rgba(47,129,255,0.32);
 }
 
-.search{
-  width: 360px;
-  max-width: 100%;
-  border-radius: 999px;
-  padding: 10px 14px;
-  background: rgba(0,0,0,0.26);
-  border: 1px solid rgba(255,255,255,0.10);
-  color: var(--txt);
-  outline:none;
+.searchBox{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(10,16,30,.55);
 }
-.search::placeholder{
-  color: rgba(234,242,247,0.45);
+.searchBox span{ opacity:.7; }
+.searchBox input{
+  border: none;
+  outline:none;
+  background: transparent;
+  color: #eaf2ff;
+  width: 320px;
+}
+@media (max-width: 900px){
+  .searchBox input{ width: 200px; }
+}
+
+/* Notices */
+.notice{
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.05);
+  opacity: .95;
+}
+.notice.error{
+  border-color: rgba(239,68,68,.35);
+  background: rgba(239,68,68,.10);
+}
+.notice.warn{
+  border-color: rgba(245,158,11,.35);
+  background: rgba(245,158,11,.10);
 }
 
 /* Server list */
 .serverList{
   margin-top: 14px;
   display:flex;
-  flex-direction:column;
-  gap: 14px;
+  flex-direction: column;
+  gap: 12px;
 }
 
-/* Each server card */
 .serverCard{
-  border-radius: 22px;
-  padding: 16px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.22), rgba(0,0,0,0.18));
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: var(--shadow2);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
 }
 
-/* top row server header */
 .serverTop{
   display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap: 10px;
-  flex-wrap:wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
 }
 
 .serverName{
-  display:flex;
-  align-items:center;
-  gap: 12px;
-  font-weight: 900;
+  font-weight: 950;
   font-size: 18px;
-  letter-spacing: 0.2px;
-  color: var(--txt);
 }
 
 .serverLink{
-  color: var(--link);
-  text-decoration:none;
+  color: #9cc7ff;
+  text-decoration: none;
 }
 .serverLink:hover{ text-decoration: underline; }
 
 .serverAddr{
-  color: rgba(234,242,247,0.74);
-  font-size: 13px;
+  opacity:.70;
+  font-size: 12px;
 }
 
-/* status pill */
 .status{
   display:inline-flex;
-  align-items:center;
-  padding: 6px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 900;
-  border: 1px solid rgba(255,255,255,0.12);
+  font-weight: 950;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
 }
-.status.up{
-  background: rgba(77,163,255,0.16);
-  border-color: rgba(77,163,255,0.28);
-  color: var(--up);
-}
-.status.down{
-  background: rgba(255,84,106,0.12);
-  border-color: rgba(255,84,106,0.24);
-  color: var(--down);
-}
+.status.up{ border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.16); }
+.status.down{ border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.12); }
 
-/* metrics row (CPU/Memory/docs/size) */
+/* Metrics */
 .metricsRow{
-  margin-top: 14px;
+  margin-top: 12px;
   display:grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-@media (max-width: 900px){
-  .metricsRow{ grid-template-columns: repeat(2, minmax(0,1fr)); }
-}
-
-.metric{
-  border-radius: 18px;
-  padding: 14px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.10);
-}
-.metricLabel{
-  font-size: 12px;
-  color: rgba(234,242,247,0.60);
-}
-.metricValue{
-  margin-top: 6px;
-  font-size: 26px;
-  font-weight: 900;
-  color: var(--txt);
-}
-.metric.good .metricValue{ color: var(--up); }
-.metric.bad  .metricValue{ color: var(--down); }
-
-/* cores block */
-.coresBlock{
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(255,255,255,0.10);
-}
-
-/* accordion header (Cores 2 ▼) */
-.coresHeaderBtn{
-  width:100%;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  padding: 12px 14px;
-  border-radius: 18px;
-
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.10);
-  color: var(--txt);
-  cursor:pointer;
-}
-.coresHeaderLeft{
-  display:flex;
-  align-items:center;
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
 }
-.coresTitle{
-  font-weight: 900;
-  font-size: 18px;
-  color: var(--txt);
+@media (max-width: 1100px){ .metricsRow{ grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 650px){ .metricsRow{ grid-template-columns: 1fr; } }
+
+.metric{
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.07);
 }
-.coresBadge{
-  min-width: 28px;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  font-size: 12px;
-  font-weight: 900;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.06);
-  color: rgba(234,242,247,0.90);
-}
-.chev{
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
+.metricLabel{ opacity:.70; font-size: 12px; }
+.metricValue{ font-size: 22px; font-weight: 950; margin-top: 6px; }
+
+.metric.good{ border-color: rgba(34,197,94,.25); }
+.metric.warn{ border-color: rgba(245,158,11,.25); }
+.metric.bad{ border-color: rgba(239,68,68,.25); }
+
+/* Cores accordion (discret) */
+.coresBlock{ margin-top: 12px; }
+
+.coresHeaderBtn{
+  width: 100%;
   display:flex;
+  justify-content: space-between;
   align-items:center;
-  justify-content:center;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(255,255,255,0.04);
-  transition: transform .2s ease;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.03);
+  color:#eaf2ff;
+  cursor:pointer;
+  font-weight: 900;
 }
+.coresHeaderBtn:disabled{ opacity:.55; cursor:not-allowed; }
+
+.coresHeaderLeft{ display:flex; align-items:center; gap:10px; }
+
+.coresTitle{ opacity:.85; }
+.coresBadge{
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.05);
+  font-size: 12px;
+  font-weight: 950;
+}
+.coresHintInline{ opacity:.6; font-size:12px; }
+
+.chev{ transition: transform .18s ease; opacity:.8; }
 .chev.rot{ transform: rotate(180deg); }
 
-.collapse{
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height .25s ease;
-}
-.collapse.open{ max-height: 900px; }
+.collapse{ display:none; }
+.collapse.open{ display:block; }
+
 .collapseInner{ padding-top: 10px; }
 
-/* cores table (exact capture) */
 .coresTableWrap{
-  border-radius: 18px;
-  overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(0,0,0,0.24);
+  border-radius: 16px;
+  overflow:hidden;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(10,16,30,.40);
 }
 
 .coresTable{
   width:100%;
   border-collapse: collapse;
-  min-width: 560px;
 }
-
 .coresTable th{
-  padding: 14px 16px;
   text-align:left;
   font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.7px;
+  letter-spacing:.06em;
   text-transform: uppercase;
-  color: rgba(234,242,247,0.70);
-  background: rgba(255,255,255,0.03);
-  border-bottom: 1px solid rgba(255,255,255,0.07);
+  padding: 12px;
+  opacity:.75;
+  border-bottom: 1px solid rgba(255,255,255,.08);
 }
-
 .coresTable td{
-  padding: 14px 16px;
-  text-align:left;
-  font-size: 13px;
-  color: rgba(234,242,247,0.92);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 12px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  opacity:.92;
 }
-
-.coresTable tr:last-child td{
-  border-bottom: none;
-}
-
-.coresTable tbody tr:hover td{
-  background: rgba(255,255,255,0.03);
-}
-
-/* Small helper */
-.muted{
-  color: rgba(234,242,247,0.60);
-  font-size: 13px;
-}
-
-/* =========================
-   FIX: anti CSS global (force DARK)
-   Colle ça tout en bas du fichier
-   ========================= */
-
-.solrPage { color: #eaf2f7 !important; }
-
-/* Les 2 grands panneaux (overview + servers) */
-.solrPage .card{
-  background: rgba(255,255,255,0.06) !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-  box-shadow: 0 18px 60px rgba(0,0,0,0.45) !important;
-}
-
-/* KPI cards */
-.solrPage .kpi{
-  background: rgba(0,0,0,0.22) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  color: #eaf2f7 !important;
-}
-
-/* Cards serveur */
-.solrPage .serverCard{
-  background: rgba(0,0,0,0.20) !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-  color: #eaf2f7 !important;
-}
-
-/* Metrics (CPU/Memory/docs/size) */
-.solrPage .metric{
-  background: rgba(255,255,255,0.05) !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-  color: #eaf2f7 !important;
-}
-
-/* Cores table wrapper */
-.solrPage .coresTableWrap{
-  background: rgba(0,0,0,0.24) !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-}
-
-/* Table cores: stop "white table" global rules */
-.solrPage .coresTable,
-.solrPage .coresTable thead,
-.solrPage .coresTable tbody,
-.solrPage .coresTable tr,
-.solrPage .coresTable th,
-.solrPage .coresTable td{
-  background: transparent !important;
-  color: rgba(234,242,247,0.92) !important;
-}
-
-.solrPage .coresTable th{
-  color: rgba(234,242,247,0.70) !important;
-  border-bottom: 1px solid rgba(255,255,255,0.07) !important;
-}
-
-.solrPage .coresTable td{
-  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
-}
-
-/* Si ton layout force du texte sombre */
-.solrPage .card *,
-.solrPage .serverCard *,
-.solrPage .kpi *,
-.solrPage .metric *{
-  color: inherit !important;
-}
-/* =========================
-   TEXT VISIBILITY FIX (PRO)
-   ========================= */
-
-/* Texte principal */
-.solrPage{
-  color: #eaf2f7 !important; /* blanc bleuté pro */
-}
-
-/* Titres forts */
-.solrPage h1,
-.solrPage h2,
-.solrPage h3,
-.solrPage .solrTitle,
-.solrPage .cardTitle,
-.solrPage .serverName,
-.solrPage .coresTitle{
-  color: #f2f7ff !important;
-}
-
-/* Texte standard (noms, valeurs, lignes) */
-.solrPage p,
-.solrPage span,
-.solrPage td,
-.solrPage th,
-.solrPage .metricValue,
-.solrPage .kpiValue{
-  color: rgba(234,242,247,0.92) !important;
-}
-
-/* Texte secondaire */
-.solrPage .muted,
-.solrPage .solrSubtitle,
-.solrPage .metricLabel,
-.solrPage .kpiLabel,
-.solrPage .serverAddr{
-  color: rgba(234,242,247,0.62) !important;
-}
-
-/* Liens */
-.solrPage a,
-.solrPage .serverLink{
-  color: #6cb6ff !important;
-}
-.solrPage a:hover{
-  color: #9ac7ff !important;
-}
-
-/* Tables : forcer lisibilité */
-.solrPage table,
-.solrPage table *{
-  color: rgba(234,242,247,0.92) !important;
-}
-
-/* Empêcher le noir forcé par d'autres CSS */
-.solrPage *{
-  text-shadow: none;
-}
-/* =========================
-   TEXT → GRAY PRO (ON BLUE)
-   ========================= */
-
-/* Titres principaux */
-.solrPage .solrTitle,
-.solrPage .cardTitle,
-.solrPage .coresTitle{
-  color: #e6edf7 !important;
-}
-
-/* NOMS + CHIFFRES (CPU %, Memory %, docs, size, solr-1…) */
-.solrPage .serverName,
-.solrPage .kpiValue,
-.solrPage .metricValue,
-.solrPage td,
-.solrPage th,
-.solrPage .status{
-  color: #c7d2e0 !important;
-}
-
-/* Labels (CPU, Memory, Total docs, subtitle, generatedAt…) */
-.solrPage .metricLabel,
-.solrPage .kpiLabel,
-.solrPage .solrSubtitle,
-.solrPage .muted,
-.solrPage .serverAddr{
-  color: rgba(199,210,224,0.65) !important;
-}
-
-/* Recherche */
-.solrPage .search{
-  color: #c7d2e0 !important;
-}
-.solrPage .search::placeholder{
-  color: rgba(199,210,224,0.45) !important;
-}
-
-/* Tables */
-.solrPage table *,
-.solrPage .coresTable td,
-.solrPage .coresTable th{
-  color: #c7d2e0 !important;
-}
-
-/* NE PAS TOUCHER au bleu du background */
-.solrPage{
-  background-attachment: fixed;
-}
+.coresTable tr:last-child td{ border-bottom:none; }

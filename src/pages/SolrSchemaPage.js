@@ -512,5 +512,7 @@ export default function SolrSchemaPage() {
         </div>
       )}
     </div>
+    
   );
+  
 }

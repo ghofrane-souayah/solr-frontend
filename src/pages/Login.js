@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/http";
+import { redirectAfterAuth } from "../auth/redirect";
 
 export default function Login() {
   const nav = useNavigate();
-  const [email, setEmail] = useState("");      // ✅ email
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -15,30 +16,33 @@ export default function Login() {
     setError("");
 
     try {
+      const cleanEmail = email.trim().toLowerCase();
+
       const res = await api("/api/auth/login", {
         method: "POST",
-        body: { email: email.trim(), password }, // ✅ envoyer email
+        body: { email: cleanEmail, password },
       });
 
-      // ✅ token
+      // ✅ Stocker token + infos
       localStorage.setItem("token", res.token);
+      localStorage.setItem("username", res.username || "");
+      localStorage.setItem("roles", JSON.stringify(res.roles || []));
 
-      // ✅ user object (utilisé partout)
+      // ✅ optionnel : stocker user complet
       const user = {
         id: res.id ?? null,
-        email: res.email ?? email.trim(),
+        email: res.email ?? cleanEmail,
         username: res.username ?? null,
         roles: res.roles ?? [],
+        companyId: res.companyId ?? null,
+        companyCode: res.companyCode ?? null,
       };
       localStorage.setItem("user", JSON.stringify(user));
 
-      // ✅ (optionnel) compat avec ton ancien code
-      localStorage.setItem("username", user.username || user.email);
-      localStorage.setItem("roles", JSON.stringify(user.roles));
-
-      nav("/solr-cluster", { replace: true });
+      // ✅ UNE SEULE redirection centralisée
+      redirectAfterAuth(nav);
     } catch (err) {
-      setError(err.message || "Login failed");
+      setError(err?.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -48,6 +52,7 @@ export default function Login() {
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 20 }}>
       <form
         onSubmit={submit}
+        autoComplete="off"
         style={{
           width: 360,
           maxWidth: "100%",
@@ -63,6 +68,9 @@ export default function Login() {
           Email
         </label>
         <input
+          type="email"
+          name="email"
+          autoComplete="off"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -75,6 +83,8 @@ export default function Login() {
         </label>
         <input
           type="password"
+          name="password"
+          autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -85,6 +95,10 @@ export default function Login() {
 
         <button disabled={loading} style={btnStyle}>
           {loading ? "..." : "Login"}
+        </button>
+
+        <button type="button" style={btnSecondary} onClick={() => nav("/register")}>
+          Créer un compte
         </button>
       </form>
     </div>
@@ -112,4 +126,15 @@ const btnStyle = {
   color: "#eaf2ff",
   cursor: "pointer",
   fontWeight: 700,
+};
+
+const btnSecondary = {
+  width: "100%",
+  padding: "10px 12px",
+  marginTop: 10,
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,.15)",
+  background: "transparent",
+  color: "#eaf2ff",
+  cursor: "pointer",
 };
