@@ -1,23 +1,95 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
+import { SolrInstanceApi } from "../api/solrInstanceApi";
 import "./SolrCluster.css";
 
 const API = "http://localhost:8081/api/solr/monitoring";
 
+function getRoles() {
+  try {
+    const roles = JSON.parse(localStorage.getItem("roles") || "[]");
+    return (Array.isArray(roles) ? roles : [])
+      .map((r) => String(r || "").replace("ROLE_", "").toUpperCase())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function getSavedCompanyId() {
+  try {
+    const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
+
+    return (
+      localStorage.getItem("companyId") ||
+      savedUser?.companyId ||
+      savedUser?.company?.id ||
+      ""
+    );
+  } catch {
+    return localStorage.getItem("companyId") || "";
+  }
+}
+
 export default function SolrCluster() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState("ALL"); // ALL | UP | DOWN
+  const [filter, setFilter] = useState("ALL");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Accordion state: { [serverName]: boolean }
   const [openCores, setOpenCores] = useState({});
-  const toggleCores = (serverName) =>
-    setOpenCores((prev) => ({ ...prev, [serverName]: !prev[serverName] }));
+  const [showAdd, setShowAdd] = useState(false);
+  const [showCopy, setShowCopy] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [selected, setSelected] = useState(null);
 
-  // ✅ évite double interval en dev (StrictMode)
   const startedRef = useRef(false);
+  const toastTimerRef = useRef(null);
+
+  const [addForm, setAddForm] = useState({
+    name: "",
+    host: "127.0.0.1",
+    port: "",
+    companyId: String(getSavedCompanyId()),
+    instancePath: "AUTO",
+    corePath: "AUTO",
+    imagePath: "solr:9.10.1",
+  });
+
+  const [copyForm, setCopyForm] = useState({
+    newName: "",
+    newPort: "",
+  });
+
+  const [toast, setToast] = useState(null);
+
+  const roles = useMemo(() => getRoles(), []);
+  const isSuperAdmin = roles.includes("SUPER_ADMIN");
+  const isAdmin = roles.includes("ADMIN") || isSuperAdmin;
+  const isUser = roles.includes("USER");
+  const canView = isSuperAdmin || isAdmin || isUser;
+  const canManage = isAdmin;
+
+  const toggleCores = (serverName) => {
+    setOpenCores((prev) => ({
+      ...prev,
+      [serverName]: !prev[serverName],
+    }));
+  };
+
+  const notify = (type, text) => {
+    setToast({ type, text });
+
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2600);
+  };
 
   const load = async () => {
     setError("");
@@ -33,8 +105,13 @@ export default function SolrCluster() {
         },
       });
 
-      if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("UNAUTHORIZED");
+      }
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
 
       const json = await res.json();
       setData(json);
@@ -56,12 +133,15 @@ export default function SolrCluster() {
     startedRef.current = true;
 
     load();
+
     const id = setInterval(load, 5000);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    return () => {
+      clearInterval(id);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
   }, []);
 
-  // ✅ Supporte plusieurs formats backend: {nodes:[]}, {servers:[]}, ou []
   const servers = useMemo(() => {
     if (!data) return [];
     if (Array.isArray(data)) return data;
@@ -98,9 +178,190 @@ export default function SolrCluster() {
     return "good";
   };
 
+  const mapInstanceError = (message, fallback) => {
+    const msg = String(message || fallback || "Erreur");
+    const lower = msg.toLowerCase();
+
+    if (lower.includes("companyid is required")) {
+      return "Company ID est obligatoire.";
+    }
+
+    if (lower.includes("port already used")) {
+      return "Le port est déjà utilisé. Choisissez un autre port.";
+    }
+
+    if (lower.includes("host + port already exists")) {
+      return "Cette combinaison host + port existe déjà.";
+    }
+
+    if (lower.includes("instance name already exists")) {
+      return "Le nom de l’instance existe déjà.";
+    }
+
+    if (lower.includes("access denied") || lower.includes("forbidden")) {
+      return "Accès refusé.";
+    }
+
+    return msg;
+  };
+
+  const openAdd = (server = null) => {
+    if (!canManage) {
+      notify("error", "Accès refusé.");
+      return;
+    }
+
+    setAddForm({
+      name: "",
+      host: server?.host || "127.0.0.1",
+      port: "",
+      companyId: String(getSavedCompanyId()),
+      instancePath: "AUTO",
+      corePath: "AUTO",
+      imagePath: "solr:9.10.1",
+    });
+    setShowAdd(true);
+  };
+
+  const openCopy = (server) => {
+    if (!canManage) {
+      notify("error", "Accès refusé.");
+      return;
+    }
+
+    setSelected(server);
+    setCopyForm({
+      newName: `${server?.name || "instance"}-copy`,
+      newPort: String(Number(server?.port || 0) + 1 || ""),
+    });
+    setShowCopy(true);
+  };
+
+  const openDelete = (server) => {
+    if (!canManage) {
+      notify("error", "Accès refusé.");
+      return;
+    }
+
+    setSelected(server);
+    setShowDelete(true);
+  };
+
+  const closeAdd = () => {
+    setShowAdd(false);
+    setAddForm({
+      name: "",
+      host: "127.0.0.1",
+      port: "",
+      companyId: String(getSavedCompanyId()),
+      instancePath: "AUTO",
+      corePath: "AUTO",
+      imagePath: "solr:9.10.1",
+    });
+  };
+
+  const closeCopy = () => {
+    setShowCopy(false);
+    setSelected(null);
+    setCopyForm({
+      newName: "",
+      newPort: "",
+    });
+  };
+
+  const closeDelete = () => {
+    setShowDelete(false);
+    setSelected(null);
+  };
+
+  const onAdd = async () => {
+    if (!canManage) {
+      notify("error", "Accès refusé.");
+      return;
+    }
+
+    const finalCompanyId = Number(addForm.companyId);
+
+    if (!finalCompanyId) {
+      notify("error", "Company ID est obligatoire.");
+      return;
+    }
+
+    try {
+      await SolrInstanceApi.create({
+        name: addForm.name.trim(),
+        host: addForm.host.trim(),
+        port: Number(addForm.port),
+        instancePath: addForm.instancePath.trim(),
+        corePath: addForm.corePath.trim(),
+        imagePath: addForm.imagePath.trim(),
+        companyId: finalCompanyId,
+      });
+
+      closeAdd();
+      notify("success", "Instance créée.");
+      await load();
+    } catch (e) {
+      const apiError =
+        e?.response?.data?.errors?.[0]?.field &&
+        e?.response?.data?.errors?.[0]?.defaultMessage
+          ? `${e.response.data.errors[0].field}: ${e.response.data.errors[0].defaultMessage}`
+          : e?.response?.data?.message || e?.message || "Erreur création";
+
+      notify("error", mapInstanceError(apiError, "Erreur création"));
+    }
+  };
+
+  const onCopy = async () => {
+    if (!selected || !canManage) return;
+
+    try {
+      await SolrInstanceApi.copy(selected.id, {
+        newName: copyForm.newName.trim(),
+        newPort: Number(copyForm.newPort),
+      });
+
+      closeCopy();
+      notify("success", "Instance copiée avec succès.");
+      await load();
+    } catch (e) {
+      notify(
+        "error",
+        mapInstanceError(
+          e?.response?.data?.message || e?.message,
+          "Erreur lors de la copie"
+        )
+      );
+    }
+  };
+
+  const onDelete = async () => {
+    if (!selected || !canManage) return;
+
+    try {
+      await SolrInstanceApi.remove(selected.id);
+      closeDelete();
+      notify("success", "Instance supprimée.");
+      await load();
+    } catch (e) {
+      notify(
+        "error",
+        mapInstanceError(
+          e?.response?.data?.message || e?.message,
+          "Erreur suppression"
+        )
+      );
+    }
+  };
+
+  if (!canView) {
+    return <div className="notice error">❌ Accès refusé.</div>;
+  }
+
   return (
     <div className="solrPage">
-      {/* HEADER */}
+      <ToastPortal toast={toast} onClose={() => setToast(null)} />
+
       <div className="solrHeader">
         <div>
           <h1 className="solrTitle">Solr Cluster</h1>
@@ -118,7 +379,6 @@ export default function SolrCluster() {
         </div>
       </div>
 
-      {/* OVERVIEW PANEL */}
       <div className="panel">
         <div className="panelTop">
           <div>
@@ -154,27 +414,47 @@ export default function SolrCluster() {
             <div className="kpiHint">Unreachable nodes</div>
           </div>
         </div>
-
-        {!data && !error && <div className="notice">⏳ Chargement...</div>}
       </div>
 
-      {/* SERVERS PANEL */}
       <div className="panel">
-        <div className="panelTop">
-          <div>
-            <div className="panelTitle">Solr servers</div>
-            <div className="panelSub">Browse nodes and inspect metrics</div>
+        <div className="panelTop panelTopServers">
+          <div className="serversTitleWrap">
+            <div>
+              <div className="panelTitle">Solr servers</div>
+              <div className="panelSub">Browse nodes and inspect metrics</div>
+            </div>
+
+            {canManage && (
+              <button
+                type="button"
+                className="addIconBtn"
+                onClick={() => openAdd()}
+                title="Add instance"
+                aria-label="Add instance"
+              >
+                +
+              </button>
+            )}
           </div>
 
           <div className="tools">
             <div className="seg">
-              <button className={filter === "ALL" ? "active" : ""} onClick={() => setFilter("ALL")}>
+              <button
+                className={filter === "ALL" ? "active" : ""}
+                onClick={() => setFilter("ALL")}
+              >
                 All
               </button>
-              <button className={filter === "UP" ? "active" : ""} onClick={() => setFilter("UP")}>
+              <button
+                className={filter === "UP" ? "active" : ""}
+                onClick={() => setFilter("UP")}
+              >
                 Up
               </button>
-              <button className={filter === "DOWN" ? "active" : ""} onClick={() => setFilter("DOWN")}>
+              <button
+                className={filter === "DOWN" ? "active" : ""}
+                onClick={() => setFilter("DOWN")}
+              >
                 Down
               </button>
             </div>
@@ -182,7 +462,7 @@ export default function SolrCluster() {
             <div className="searchBox">
               <span>⌕</span>
               <input
-                placeholder="Search name / host / port…"
+                placeholder="Search name / host / port..."
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
@@ -205,18 +485,47 @@ export default function SolrCluster() {
             return (
               <div key={`${s.name}-${s.host}-${s.port}`} className="serverCard">
                 <div className="serverTop">
-                  <div className="serverName">
-                    <Link to={`/solr/server/${s.name}`} className="serverLink" title={`Open ${s.name} details`}>
-                      {s.name}
-                    </Link>{" "}
-                    —{" "}
-                    <span className={`status ${s.status === "UP" ? "up" : "down"}`}>
-                      {s.status}
-                    </span>
+                  <div>
+                    <div className="serverNameRow">
+                      <Link
+                        to={`/solr/server/${s.id}`}
+                        className="serverLink serverName"
+                      >
+                        {s.name}
+                      </Link>
+
+                      <span
+                        className={`status ${s.status === "UP" ? "up" : "down"}`}
+                      >
+                        {s.status}
+                      </span>
+                    </div>
+
+                    <div className="serverAddr mono">
+                      {s.host}:{s.port}
+                    </div>
                   </div>
 
-                  <div className="serverAddr mono">
-                    {s.host}:{s.port}
+                  <div className="serverActions directActions">
+                    {canManage && (
+                      <button
+                        type="button"
+                        className="btn secondary small"
+                        onClick={() => openCopy(s)}
+                      >
+                        Copy
+                      </button>
+                    )}
+
+                    {canManage && (
+                      <button
+                        type="button"
+                        className="btn danger small"
+                        onClick={() => openDelete(s)}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -238,16 +547,18 @@ export default function SolrCluster() {
 
                   <div className="metric">
                     <div className="metricLabel">Total size</div>
-                    <div className="metricValue">{formatBytes(s.totalSizeInBytes ?? 0)}</div>
+                    <div className="metricValue">
+                      {formatBytes(s.totalSizeInBytes ?? 0)}
+                    </div>
                   </div>
                 </div>
 
                 {Array.isArray(s.alerts) && s.alerts.length > 0 && (
                   <div className="notice warn">⚠️ Alerts: {s.alerts.join(", ")}</div>
                 )}
+
                 {s.error && <div className="notice error">❌ {s.error}</div>}
 
-                {/* CORES */}
                 <div className="coresBlock">
                   <button
                     type="button"
@@ -261,7 +572,9 @@ export default function SolrCluster() {
                     <div className="coresHeaderLeft">
                       <span className="coresTitle">Cores</span>
                       <span className="coresBadge">{cores.length}</span>
-                      {!hasCores ? <span className="coresHintInline">Aucun core</span> : null}
+                      {!hasCores ? (
+                        <span className="coresHintInline">Aucun core</span>
+                      ) : null}
                     </div>
 
                     <span className={`chev ${isOpen ? "rot" : ""}`}>▾</span>
@@ -302,23 +615,227 @@ export default function SolrCluster() {
                     </div>
                   </div>
                 </div>
-                {/* END CORES */}
               </div>
             );
           })}
         </div>
       </div>
+
+      {showAdd && canManage && (
+        <Modal title="Add instance" onClose={closeAdd}>
+          <div className="modalField">
+            <label className="label">Name</label>
+            <input
+              className="input"
+              value={addForm.name}
+              onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+              placeholder="ex: solr-prod-1"
+            />
+          </div>
+
+          <div className="modalField">
+            <label className="label">Host</label>
+            <input
+              className="input"
+              value={addForm.host}
+              onChange={(e) => setAddForm({ ...addForm, host: e.target.value })}
+              placeholder="ex: 127.0.0.1"
+            />
+          </div>
+
+          <div className="modalField">
+            <label className="label">Port</label>
+            <input
+              className="input"
+              type="number"
+              value={addForm.port}
+              onChange={(e) => setAddForm({ ...addForm, port: e.target.value })}
+              placeholder="ex: 8983"
+            />
+          </div>
+
+          <div className="modalField">
+            <label className="label">Company ID</label>
+            <input
+              className="input"
+              type="number"
+              value={addForm.companyId}
+              onChange={(e) =>
+                setAddForm({ ...addForm, companyId: e.target.value })
+              }
+              placeholder="ex: 1"
+            />
+          </div>
+
+          <div className="modalFoot">
+            <button type="button" className="btn ghost" onClick={closeAdd}>
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              className="btn primary"
+              onClick={onAdd}
+              disabled={
+                !addForm.name.trim() ||
+                !addForm.host.trim() ||
+                !addForm.port ||
+                !addForm.companyId
+              }
+            >
+              Create
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showCopy && selected && canManage && (
+        <Modal title="Copy instance" onClose={closeCopy}>
+          <div className="hint">
+            Source: <b>{selected.name}</b> ({selected.host}:{selected.port})
+          </div>
+
+          <div className="modalField">
+            <label className="label">New name</label>
+            <input
+              className="input"
+              value={copyForm.newName}
+              onChange={(e) =>
+                setCopyForm({ ...copyForm, newName: e.target.value })
+              }
+              placeholder="Enter new instance name"
+            />
+          </div>
+
+          <div className="modalField">
+            <label className="label">New port</label>
+            <input
+              className="input"
+              type="number"
+              value={copyForm.newPort}
+              onChange={(e) =>
+                setCopyForm({ ...copyForm, newPort: e.target.value })
+              }
+              placeholder="Enter new port"
+            />
+          </div>
+
+          <div className="modalFoot">
+            <button type="button" className="btn ghost" onClick={closeCopy}>
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              className="btn primary"
+              onClick={onCopy}
+              disabled={!copyForm.newName.trim() || !copyForm.newPort}
+            >
+              Copy
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showDelete && selected && canManage && (
+        <Modal title="Delete instance" onClose={closeDelete}>
+          <div className="dangerBox">
+            This will permanently delete <b>{selected.name}</b>.
+          </div>
+
+          <div className="modalFoot">
+            <button type="button" className="btn ghost" onClick={closeDelete}>
+              Cancel
+            </button>
+
+            <button type="button" className="btn danger" onClick={onDelete}>
+              Delete
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
+  );
+}
+
+function ToastPortal({ toast, onClose }) {
+  if (!toast) return null;
+
+  return createPortal(
+    <div
+      style={{
+        position: "fixed",
+        top: "20px",
+        right: "20px",
+        zIndex: 2147483647,
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        className={`entToast ${toast.type}`}
+        role="alert"
+        aria-live="polite"
+        style={{
+          position: "relative",
+          zIndex: 2147483647,
+          pointerEvents: "auto",
+        }}
+      >
+        <span className="dot" />
+        <div className="text">{toast.text}</div>
+        <button className="x" onClick={onClose} type="button">
+          ✕
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function Modal({ title, children, onClose }) {
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div className="modalOverlay" onMouseDown={onClose}>
+      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modalHead">
+          <h3 className="modalTitle">{title}</h3>
+
+          <button type="button" className="modalClose" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+
+        <div className="modalBody">{children}</div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
 function formatBytes(bytes) {
   const b = Number(bytes) || 0;
   if (b < 1024) return `${b} B`;
+
   const kb = b / 1024;
   if (kb < 1024) return `${kb.toFixed(1)} KB`;
+
   const mb = kb / 1024;
   if (mb < 1024) return `${mb.toFixed(1)} MB`;
+
   const gb = mb / 1024;
   return `${gb.toFixed(2)} GB`;
 }

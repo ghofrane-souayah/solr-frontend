@@ -1,13 +1,25 @@
-import { hasRole } from "./roles";
 
-export function redirectAfterAuth(navigate) {
-  if (hasRole("SUPER_ADMIN", "ADMIN")) {
-    navigate("/dashboard", { replace: true });
+export function redirectAfterAuth(nav) {
+  let roles = [];
+
+  try {
+    roles = JSON.parse(localStorage.getItem("roles") || "[]");
+  } catch {
+    roles = [];
+  }
+
+  const normalized = roles
+    .map((r) => String(r || "").replace("ROLE_", "").toUpperCase())
+    .filter(Boolean);
+
+  const isSuperAdmin = normalized.includes("SUPER_ADMIN");
+  const isAdmin = normalized.includes("ADMIN");
+  const isUser = normalized.includes("USER");
+
+  if (isSuperAdmin || isAdmin || isUser) {
+    nav("/solr-cluster");
     return;
   }
-  if (hasRole("USER")) {
-    navigate("/solr-cluster", { replace: true });
-    return;
-  }
-  navigate("/account", { replace: true });
+
+  nav("/forbidden");
 }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { register } from "../services/authService";
+import "./Register.css";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [companyCode, setCompanyCode] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -23,7 +25,6 @@ export default function Register() {
     try {
       await register({ username, email, password, companyCode });
       setOk("Compte créé ✅ Vérifie ton email pour activer le compte.");
-      // option : rediriger vers login après 2s
       setTimeout(() => navigate("/login", { replace: true }), 1500);
     } catch (e2) {
       setErr(e2?.message || "Register failed");
@@ -33,44 +34,140 @@ export default function Register() {
   };
 
   return (
-    <div style={styles.wrap}>
-      <form onSubmit={onSubmit} style={styles.card}>
-        <h2 style={{ marginTop: 0 }}>Création du compte</h2>
+    <div className="register-page">
+      <div className="register-shell">
+        <div className="register-brand">
+          <div className="brand-icon">
+            <DatabaseIcon />
+          </div>
+          <h1>Solr Admin</h1>
+          <p>Create your monitoring platform account</p>
+        </div>
 
-        <label style={styles.label}>Username</label>
-        <input style={styles.input} value={username} onChange={(e) => setUsername(e.target.value)} required />
+        <div className="register-container">
+          <h2>Création du compte</h2>
 
-        <label style={styles.label}>Email</label>
-        <input style={styles.input} value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <form className="register-form" onSubmit={onSubmit} autoComplete="off">
+            <label>USERNAME</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="username"
+              required
+            />
 
-        <label style={styles.label}>Password</label>
-        <input style={styles.input} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <label>EMAIL</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="email@company.com"
+              required
+            />
 
-        <label style={styles.label}>Company Code</label>
-        <input style={styles.input} value={companyCode} onChange={(e) => setCompanyCode(e.target.value)} required />
+            <label>PASSWORD</label>
+            <div className="password-wrapper">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword((p) => !p)}
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                title={showPassword ? "Masquer" : "Afficher"}
+              >
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
 
-        {err && <div style={styles.err}>{err}</div>}
-        {ok && <div style={styles.ok}>{ok}</div>}
+            <label>COMPANY CODE</label>
+            <input
+              type="text"
+              value={companyCode}
+              onChange={(e) => setCompanyCode(e.target.value)}
+              placeholder="Company code"
+              required
+            />
 
-        <button style={styles.btn} disabled={loading}>
-          {loading ? "Création..." : "Créer"}
-        </button>
+            {err && <div className="register-error">{err}</div>}
+            {ok && <div className="register-success">{ok}</div>}
 
-        <button type="button" style={styles.btnSecondary} onClick={() => navigate("/login")}>
-          Retour login
-        </button>
-      </form>
+            <button type="submit" className="primary-btn" disabled={loading}>
+              {loading ? "Création..." : "Créer"}
+            </button>
+
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => navigate("/login")}
+            >
+              Retour login
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
 
-const styles = {
-  wrap: { minHeight: "100vh", display: "grid", placeItems: "center", padding: 20, background: "#0b1220" },
-  card: { width: 420, padding: 20, border: "1px solid rgba(148,163,184,.18)", borderRadius: 12, background: "rgba(15,23,42,.9)", color: "#e5e7eb" },
-  label: { display: "block", marginTop: 12, marginBottom: 6, fontSize: 13, color: "rgba(226,232,240,.85)" },
-  input: { width: "100%", padding: 10, border: "1px solid rgba(148,163,184,.22)", borderRadius: 10, background: "rgba(2,6,23,.55)", color: "#e5e7eb", outline: "none" },
-  btn: { width: "100%", padding: 10, marginTop: 16, borderRadius: 10, border: "1px solid rgba(59,130,246,.35)", background: "rgba(37,99,235,.9)", color: "white", cursor: "pointer", fontWeight: 700 },
-  btnSecondary: { width: "100%", padding: 10, marginTop: 10, borderRadius: 10, border: "1px solid rgba(148,163,184,.22)", background: "transparent", color: "rgba(226,232,240,.85)", cursor: "pointer" },
-  err: { marginTop: 10, color: "#fecaca", fontSize: 13, background: "rgba(220,38,38,.14)", padding: 10, borderRadius: 10 },
-  ok: { marginTop: 10, color: "#bbf7d0", fontSize: 13, background: "rgba(34,197,94,.12)", padding: 10, borderRadius: 10 },
-};
+function DatabaseIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <ellipse cx="12" cy="5" rx="7" ry="3.2" />
+      <path d="M5 5v6c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2V5" />
+      <path d="M5 11v6c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2v-6" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.11 1 12c.7-1.66 1.79-3.17 3.17-4.39" />
+      <path d="M10.58 10.58a2 2 0 1 0 2.83 2.83" />
+      <path d="M9.88 4.24A10.94 10.94 0 0 1 12 4c5 0 9.27 3.89 11 8a10.94 10.94 0 0 1-2.12 3.19" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}

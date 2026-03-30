@@ -9,35 +9,24 @@ import Layout from "./Layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import SolrCluster from "./pages/SolrCluster";
 import SolrServerDetails from "./pages/SolrServerDetails";
-import SolrSchema from "./pages/SolrSchema";
+import SolrSchemaPage from "./pages/SolrSchemaPage";
 import Users from "./pages/Users";
 import Companies from "./pages/Companies";
-
 import Profile from "./pages/profile";
 import Forbidden from "./components/Forbidden";
-
 import RequireAuth from "./components/RequireAuth";
+import SolrInstances from "./pages/SolrInstances";
 
 export default function App() {
   return (
     <Routes>
-      {/* ✅ Public */}
+      {/* Public */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/forbidden" element={<Forbidden />} />
 
-      {/* ✅ USER route (token required) */}
-      <Route
-        path="/profile"
-        element={
-          <RequireAuth>
-            <Profile />
-          </RequireAuth>
-        }
-      />
-
-      {/* ✅ Protected Layout (token required) */}
+      {/* Protected layout */}
       <Route
         path="/"
         element={
@@ -46,10 +35,17 @@ export default function App() {
           </RequireAuth>
         }
       >
-        {/* ✅ default داخل Layout */}
-        <Route index element={<Navigate to="/solr-cluster" replace />} />
+        <Route index element={<Navigate to="solr-cluster" replace />} />
 
-        {/* ✅ ADMIN / SUPER_ADMIN */}
+        <Route
+          path="profile"
+          element={
+            <RequireAuth allow={["USER", "ADMIN", "SUPER_ADMIN"]}>
+              <Profile />
+            </RequireAuth>
+          }
+        />
+
         <Route
           path="dashboard"
           element={
@@ -77,7 +73,6 @@ export default function App() {
           }
         />
 
-        {/* ✅ Solr pages: USER + ADMIN + SUPER_ADMIN */}
         <Route
           path="solr-cluster"
           element={
@@ -88,7 +83,16 @@ export default function App() {
         />
 
         <Route
-          path="solr/server/:name"
+          path="solr-instances"
+          element={
+            <RequireAuth allow={["USER", "ADMIN", "SUPER_ADMIN"]}>
+              <SolrInstances />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="solr/server/:id"
           element={
             <RequireAuth allow={["USER", "ADMIN", "SUPER_ADMIN"]}>
               <SolrServerDetails />
@@ -100,13 +104,12 @@ export default function App() {
           path="solr-schema"
           element={
             <RequireAuth allow={["USER", "ADMIN", "SUPER_ADMIN"]}>
-              <SolrSchema />
+              <SolrSchemaPage />
             </RequireAuth>
           }
         />
       </Route>
 
-      {/* ✅ Catch-all */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );

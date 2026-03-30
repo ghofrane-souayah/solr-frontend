@@ -1,32 +1,35 @@
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 
-function getRoles() {
-  try {
-    const raw = localStorage.getItem("roles");
-    const arr = raw ? JSON.parse(raw) : [];
-    return (Array.isArray(arr) ? arr : [])
-      .map((r) => String(r || "").replace("ROLE_", "").toUpperCase())
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
+function normalizeRoles(rawRoles) {
+  return (Array.isArray(rawRoles) ? rawRoles : [])
+    .map((r) => String(r || "").replace("ROLE_", "").toUpperCase())
+    .filter(Boolean);
 }
 
-export default function RequireAuth({ children, allow = [] }) {
+export default function RequireAuth({ allow, children }) {
+  const location = useLocation();
+
   const token = localStorage.getItem("token");
-  const roles = getRoles();
-  const loc = useLocation();
 
-  // 1) Pas de token => login
+  let roles = [];
+  try {
+    roles = normalizeRoles(JSON.parse(localStorage.getItem("roles") || "[]"));
+  } catch {
+    roles = [];
+  }
+
   if (!token) {
-    return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 2) Si allow est fourni => vérifier rôle
-  if (allow.length > 0) {
-    const ok = roles.some((r) => allow.includes(r));
-    if (!ok) return <Navigate to="/forbidden" replace />;
+  if (allow && allow.length > 0) {
+    const allowed = allow.map((r) => String(r).toUpperCase());
+    const ok = roles.some((r) => allowed.includes(r));
+
+    if (!ok) {
+      return <Navigate to="/forbidden" replace />;
+    }
   }
 
-  return children;
+  return children ? children : <Outlet />;
 }

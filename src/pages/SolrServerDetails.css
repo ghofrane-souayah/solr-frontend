@@ -259,3 +259,5 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.coreRowClickable { cursor: pointer; }
+.coreRowClickable:hover td { background: rgba(255,255,255,0.04); }

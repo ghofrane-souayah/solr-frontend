@@ -270,33 +270,29 @@ useEffect(() => {
   return (
     <div className="usersWrap">
       {/* ✅ Corporate header */}
-      <div className="usersTop">
-        <div>
-          <div className="usersH1">Users</div>
-          <div className="usersCrumb">
-            Home <span className="dot">•</span> Account Management <span className="dot">•</span>{" "}
-            <span className="muted">{scopeLabel}</span>
-          </div>
-        </div>
+     <div className="usersTop">
+  <div>
+    <div className="usersCrumb">
+      Home <span className="dot">•</span> Account Management <span className="dot">•</span>{" "}
+      <span className="muted">{scopeLabel}</span>
+    </div>
+  </div>
 
-        <div className="usersTopActions">
-          <div className="userChip">
-            <span className="uDot" />
-            {username} <span className="muted">({roles[0] || "—"})</span>
-          </div>
-          <button className="btn" onClick={load} disabled={loading || !isAdmin}>
-            ⟳ Refresh
-          </button>
+  <div className="usersTopActions">
+    <button className="btn ghost" onClick={load} disabled={loading || !isAdmin}>
+      ⟳ Refresh
+    </button>
 
-          {isAdmin && (
-            <button className="btn primary" onClick={openAdd} disabled={loading}>
-              + Add user
-            </button>
-          )}
-        </div>
-      </div>
+    {isAdmin && (
+      <button className="btn primary" onClick={openAdd} disabled={loading}>
+        + Add user
+      </button>
+    )}
+  </div>
+</div>
+      
 
-      {error && <div className="alert danger">{error}</div>}
+     {error && <div className="alert danger">{error}</div>}
       {!error && loading && <div className="alert">Loading…</div>}
 
       {/* ✅ KPI */}
@@ -472,82 +468,94 @@ useEffect(() => {
       </div>
 
       {/* ✅ Modal (ton modal existant) */}
-      {open && (
-        <div className="modalOverlay" onMouseDown={() => setOpen(false)}>
-          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="modalHead">
-              <div className="modalTitle">{mode === "add" ? "Add user" : "Edit user"}</div>
-              <button className="iconBtn" onClick={() => setOpen(false)}>
-                ✕
-              </button>
-            </div>
+     {open && (
+  <div className="modalOverlay" onMouseDown={() => setOpen(false)}>
+    <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modalHead">
+        <h3 className="modalTitle">{mode === "add" ? "Add user" : "Edit user"}</h3>
 
-            <div className="modalBody">
-              <label className="label">
-                Username
-                <input
-                  className="input"
-                  value={form.username}
-                  onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
-                />
-              </label>
+        <button
+          type="button"
+          className="modalClose"
+          onClick={() => setOpen(false)}
+        >
+          ✕
+        </button>
+      </div>
 
-              <label className="label">
-                Email
-                <input
-                  className="input"
-                  value={form.email}
-                  onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                />
-              </label>
-
-              <label className="label">
-                Role
-                <select
-                  className="input"
-                  value={form.role}
-                  onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
-                >
-                  <option value="ADMIN">ADMIN</option>
-                  <option value="USER">USER</option>
-                  {isSuperAdmin && <option value="SUPER_ADMIN">SUPER_ADMIN</option>}
-                </select>
-              </label>
-
-              <label className="label">
-                Status
-                <select
-                  className="input"
-                  value={form.enabled ? "true" : "false"}
-                  onChange={(e) => setForm((p) => ({ ...p, enabled: e.target.value === "true" }))}
-                >
-                  <option value="true">Enabled</option>
-                  <option value="false">Disabled</option>
-                </select>
-              </label>
-
-              <label className="label">
-                Password {mode === "edit" ? "(leave empty to keep)" : ""}
-                <input
-                  className="input"
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                />
-              </label>
-            </div>
-
-            <div className="modalFoot">
-              <button className="btn ghost" onClick={() => setOpen(false)}>
-                Cancel
-              </button>
-              <button className="btn primary" onClick={submit} disabled={loading}>
-                {mode === "add" ? "Create" : "Save"}
-              </button>
-            </div>
-          </div>
+      <div className="modalBody">
+        <div className="modalField">
+          <label className="label">Username</label>
+          <input
+            className="input"
+            value={form.username}
+            onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
+            placeholder="Enter username"
+          />
         </div>
-      )}
+
+        <div className="modalField">
+          <label className="label">Email</label>
+          <input
+            className="input"
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+            placeholder="Enter email"
+          />
+        </div>
+
+        <div className="modalField">
+          <label className="label">Role</label>
+          <select
+            className="select"
+            value={form.role}
+            onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
+          >
+            <option value="ADMIN">ADMIN</option>
+            <option value="USER">USER</option>
+            {isSuperAdmin && <option value="SUPER_ADMIN">SUPER_ADMIN</option>}
+          </select>
+        </div>
+
+        <div className="modalField">
+          <label className="label">Status</label>
+          <select
+            className="select"
+            value={form.enabled ? "true" : "false"}
+            onChange={(e) => setForm((p) => ({ ...p, enabled: e.target.value === "true" }))}
+          >
+            <option value="true">Enabled</option>
+            <option value="false">Disabled</option>
+          </select>
+        </div>
+
+        <div className="modalField">
+          <label className="label">
+            Password {mode === "edit" ? "(leave empty to keep)" : ""}
+          </label>
+          <input
+            className="input"
+            type="password"
+            value={form.password}
+            onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+            placeholder={mode === "edit" ? "Leave empty to keep current password" : "Enter password"}
+          />
+        </div>
+      </div>
+
+      <div className="modalFoot">
+        <button type="button" className="btn ghost" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+
+        <button type="button" className="btn primary" onClick={submit} disabled={loading}>
+          {mode === "add" ? "Create" : "Save"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }

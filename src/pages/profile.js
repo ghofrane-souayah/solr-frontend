@@ -23,13 +23,6 @@ function getRoles() {
   }
 }
 
-function pillClass(role) {
-  const r = String(role || "").toUpperCase();
-  if (r.includes("SUPER")) return "pill pillPurple";
-  if (r.includes("ADMIN")) return "pill pillBlue";
-  return "pill pillGray";
-}
-
 function strengthScore(pwd) {
   const p = String(pwd || "");
   let s = 0;
@@ -45,8 +38,6 @@ export default function Profile() {
   const navigate = useNavigate();
   const roles = useMemo(() => getRoles(), []);
   const isAdmin = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
-
-  const [tab, setTab] = useState("account"); // account | security
 
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -69,10 +60,28 @@ export default function Profile() {
       const res = await fetch(`${API}/me`, { headers });
       if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setMe(await res.json());
+
+      const data = await res.json();
+      setMe(data);
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          id: data?.id ?? null,
+          email: data?.email ?? "",
+          username: data?.username ?? "",
+          companyId: data?.companyId ?? null,
+          companyName: data?.companyName ?? "",
+          role: data?.role ?? roles?.[0] ?? "ADMIN",
+        })
+      );
     } catch (e) {
       setMe(null);
-      setErr(e?.message === "UNAUTHORIZED" ? "Session expirée. Reconnectez-vous." : "Erreur chargement profil.");
+      setErr(
+        e?.message === "UNAUTHORIZED"
+          ? "Session expirée. Reconnectez-vous."
+          : "Erreur chargement profil."
+      );
     } finally {
       setLoading(false);
     }
@@ -86,19 +95,34 @@ export default function Profile() {
   const initials = useMemo(() => {
     const u = me?.username || me?.email || "U";
     const parts = String(u).split(/[\s.@_:-]+/).filter(Boolean);
-    return (parts[0]?.[0] || "U").toUpperCase() + (parts[1]?.[0] || "").toUpperCase();
+    return (
+      (parts[0]?.[0] || "U").toUpperCase() +
+      (parts[1]?.[0] || "").toUpperCase()
+    );
   }, [me]);
 
-  const goBack = () => {
-    if (window.history.length > 2) navigate(-1);
-    else navigate(isAdmin ? "/dashboard" : "/profile", { replace: true });
-  };
+  const displayRole =
+    me?.role ||
+    roles[0] ||
+    "ADMIN";
+
+  const canSave =
+    oldPassword.trim() &&
+    newPassword.trim() &&
+    newPassword.trim().length >= 8 &&
+    !loading;
 
   const strength = strengthScore(newPassword);
   const strengthLabel =
-    strength <= 1 ? "Faible" : strength === 2 ? "Moyen" : strength === 3 ? "Bon" : strength === 4 ? "Fort" : "Très fort";
-
-  const canSave = oldPassword.trim() && newPassword.trim() && newPassword.trim().length >= 8 && !loading;
+    strength <= 1
+      ? "Faible"
+      : strength === 2
+      ? "Moyen"
+      : strength === 3
+      ? "Bon"
+      : strength === 4
+      ? "Fort"
+      : "Très fort";
 
   const changePassword = async () => {
     setErr("");
@@ -108,6 +132,7 @@ export default function Profile() {
       setErr("Veuillez remplir les deux champs.");
       return;
     }
+
     if (newPassword.trim().length < 8) {
       setErr("Nouveau mot de passe trop court (min 8).");
       return;
@@ -127,8 +152,7 @@ export default function Profile() {
 
       setOldPassword("");
       setNewPassword("");
-      setOk("Mot de passe modifié ✅");
-      setTab("account");
+      setOk("Mot de passe modifié avec succès.");
     } catch (e) {
       setErr(e.message || "Erreur.");
     } finally {
@@ -136,175 +160,190 @@ export default function Profile() {
     }
   };
 
-return (
-  <div className="setPage">
-    {/* Header */}
-    <div className="setHeader">
-      <div className="setHeaderLeft">
-        <button className="iconBtn" onClick={goBack} title="Retour">
-          ←
-        </button>
-        <div>
-          <div className="setTitle">Account settings</div>
-          <div className="setSub">Manage your account information and security preferences.</div>
+  const goBack = () => {
+    if (window.history.length > 2) navigate(-1);
+    else navigate(isAdmin ? "/dashboard" : "/profile", { replace: true });
+  };
+
+  return (
+    <div className="accountPage">
+      {(err || ok || loading) && (
+        <div className="accountMessages">
+          {err && <div className="alert danger">{err}</div>}
+          {ok && <div className="alert success">{ok}</div>}
+          {!err && loading && <div className="alert">Chargement…</div>}
+        </div>
+      )}
+
+      <div className="accountCard">
+        <div className="accountHeader">
+          <div className="accountAvatar">{initials || "U"}</div>
+
+          <div className="accountIdentity">
+            <h2>{me?.username || me?.email || "—"}</h2>
+            <div className="accountMainRole">{displayRole}</div>
+          </div>
+        </div>
+
+        <div className="accountInfoList">
+          <div className="accountInfoRow">
+            <div className="accountInfoIcon">
+              <UserIcon />
+            </div>
+            <div className="accountInfoText">
+              <div className="accountInfoLabel">Username</div>
+              <div className="accountInfoValue">{me?.username || "—"}</div>
+            </div>
+          </div>
+
+          <div className="accountInfoRow">
+            <div className="accountInfoIcon">
+              <MailIcon />
+            </div>
+            <div className="accountInfoText">
+              <div className="accountInfoLabel">Email</div>
+              <div className="accountInfoValue">{me?.email || "—"}</div>
+            </div>
+          </div>
+
+          <div className="accountInfoRow">
+            <div className="accountInfoIcon">
+              <ShieldIcon />
+            </div>
+            <div className="accountInfoText">
+              <div className="accountInfoLabel">Roles</div>
+              <div className="accountRoles">
+                {(me?.role ? [me.role] : roles.length ? roles : ["ADMIN"]).map((role) => (
+                  <span key={role} className="roleBadge">
+                    {String(role).replace("ROLE_", "").toUpperCase()}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="setHeaderActions">
-    
-        <button className="btn ghost" onClick={loadMe} disabled={loading}>
-          ⟳ Refresh
-        </button>
-      </div>
-    </div>
-
-    {err && <div className="alert danger">{err}</div>}
-    {ok && <div className="alert success">{ok}</div>}
-    {!err && loading && <div className="alert">Chargement…</div>}
-
-    <div className="setGrid">
-      {/* LEFT */}
-      <div className="setMain">
-        <div className="section">
-          <div className="sectionHead">
-            <div className="sectionTitle">Compte</div>
-            <div className="sectionDesc">Informations de base</div>
+      <div className="securityCard">
+        <div className="securityHead">
+          <div>
+            <div className="securityTitle">Security</div>
+            <div className="securityDesc">Changer le mot de passe</div>
           </div>
 
-          <div className="kv2">
-            <div className="kvRow">
-              <div className="k">Username</div>
-              <div className="v">{me?.username || "—"}</div>
-            </div>
-            <div className="kvRow">
-              <div className="k">Email</div>
-              <div className="v">{me?.email || "—"}</div>
-            </div>
-          </div>
+          <button className="miniActionBtn" type="button" onClick={loadMe} disabled={loading}>
+            Refresh
+          </button>
         </div>
 
-        <div className="section">
-          <div className="sectionHead">
-            <div className="sectionTitle">Organisation</div>
-            <div className="sectionDesc">Entreprise et affectation</div>
-          </div>
-
-          <div className="kv2">
-            <div className="kvRow">
-              <div className="k">Company</div>
-              <div className="v">{me?.companyName || "—"}</div>
-            </div>
-            <div className="kvRow">
-              <div className="k">Company ID</div>
-              <div className="v">#{me?.companyId ?? "—"}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="section compact">
-          <div className="sectionHead">
-            <div className="sectionTitle">Identifiants</div>
-            <div className="sectionDesc">Informations internes</div>
-          </div>
-
-          <div className="kv2">
-            <div className="kvRow">
-              <div className="k">User ID</div>
-              <div className="v">{me?.id ?? "—"}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Security inline */}
-        <div className="section">
-          <div className="sectionHead">
-            <div className="sectionTitle">Sécurité</div>
-            <div className="sectionDesc">Changer le mot de passe</div>
-          </div>
-
-          <div className="formStack">
-            <label className="label">
-              Ancien mot de passe
+        <div className="securityGrid">
+          <label className="field">
+            <span>Ancien mot de passe</span>
+            <div className="passwordField">
               <input
                 className="input"
                 type={showOld ? "text" : "password"}
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
+                placeholder="Entrer l'ancien mot de passe"
               />
-            </label>
+              <button
+                type="button"
+                className="eyeBtn"
+                onClick={() => setShowOld((p) => !p)}
+              >
+                {showOld ? "Hide" : "Show"}
+              </button>
+            </div>
+          </label>
 
-            <label className="label">
-              Nouveau mot de passe
+          <label className="field">
+            <span>Nouveau mot de passe</span>
+            <div className="passwordField">
               <input
                 className="input"
                 type={showNew ? "text" : "password"}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Entrer le nouveau mot de passe"
               />
-            </label>
-
-            <div className="inlineTools">
-              <button className="miniBtn" type="button" onClick={() => setShowOld(p => !p)}>
-                {showOld ? "Hide old" : "Show old"}
-              </button>
-              <button className="miniBtn" type="button" onClick={() => setShowNew(p => !p)}>
-                {showNew ? "Hide new" : "Show new"}
+              <button
+                type="button"
+                className="eyeBtn"
+                onClick={() => setShowNew((p) => !p)}
+              >
+                {showNew ? "Hide" : "Show"}
               </button>
             </div>
+          </label>
+        </div>
 
-            <div className="pwdMeta">
-              <div className="pwdLine">
-                <span>Strength</span>
-                <b>{strengthLabel}</b>
-              </div>
-              <div className="strengthBar">
-                <div className="strengthFill" style={{ width: `${(strength / 5) * 100}%` }} />
-              </div>
-              <div className="hint">8+ chars, uppercase, lowercase, number, symbol.</div>
-            </div>
-
-            <div className="sectionFoot">
-              <button className="btn ghost" type="button" onClick={() => { setOldPassword(""); setNewPassword(""); }}>
-                Clear
-              </button>
-              <button className="btn primary" type="button" onClick={changePassword} disabled={!canSave}>
-                Save password
-              </button>
-            </div>
+        <div className="pwdMeta">
+          <div className="pwdLine">
+            <span>Password strength</span>
+            <b>{strengthLabel}</b>
           </div>
+
+          <div className="strengthBar">
+            <div
+              className="strengthFill"
+              style={{ width: `${(strength / 5) * 100}%` }}
+            />
+          </div>
+
+          <div className="hint">
+            8+ caractères, majuscule, minuscule, chiffre et symbole.
+          </div>
+        </div>
+
+        <div className="securityActions">
+          <button
+            className="btn ghost"
+            type="button"
+            onClick={() => {
+              setOldPassword("");
+              setNewPassword("");
+            }}
+          >
+            Clear
+          </button>
+
+          <button
+            className="btn primary"
+            type="button"
+            onClick={changePassword}
+            disabled={!canSave}
+          >
+            Save password
+          </button>
         </div>
       </div>
-
-      {/* RIGHT (ACTIONS ONLY) */}
-      <aside className="setSide">
-        <div className="sideCard">
-          <div className="sideTop">
-            <div className="avatar">{initials}</div>
-            <div>
-              <div className="sideName">{me?.username || "—"}</div>
-              <div className="sideEmail">{me?.email || "—"}</div>
-            </div>
-          </div>
-
-          <div className="sidePills">
-            <span className={pillClass(me?.role)}>{me?.role || "—"}</span>
-            <span className={me?.enabled ? "pill pillGreen" : "pill pillRed"}>
-              {me?.enabled ? "Enabled" : "Disabled"}
-            </span>
-          </div>
-
-         
-
-          <div className="sideNote">
-            <div className="noteTitle">Password policy</div>
-            <div className="noteText">
-              Use a unique password. Avoid reused credentials. Change it regularly.
-            </div>
-          </div>
-        </div>
-      </aside>
     </div>
-  </div>
-);
+  );
+}
 
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20c1.8-3.2 4.2-4.8 7-4.8s5.2 1.6 7 4.8" />
+    </svg>
+  );
+}
+
+function MailIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <path d="M4 6h16v12H4z" />
+      <path d="M4 7l8 6 8-6" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+    </svg>
+  );
 }

@@ -21,7 +21,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const roles = useMemo(() => getRoles(), []);
   const isSuperAdmin = roles.includes("SUPER_ADMIN");
-  const isAdmin = roles.includes("ADMIN") || isSuperAdmin; // ✅ AJOUT
+  const isAdmin = roles.includes("ADMIN") || isSuperAdmin;
 
   const authHeaders = useMemo(() => {
     const token = localStorage.getItem("token");
@@ -46,6 +46,12 @@ export default function Dashboard() {
   const [companyStatus, setCompanyStatus] = useState({});
   const [openMenuId, setOpenMenuId] = useState(null);
   const menuRef = useRef(null);
+
+  // ✅ Add company modal
+  const [openAddCompany, setOpenAddCompany] = useState(false);
+  const [newCompany, setNewCompany] = useState({ name: "", code: "" });
+  const [adding, setAdding] = useState(false);
+  const [addErr, setAddErr] = useState("");
 
   useEffect(() => {
     const onClick = (e) => {
@@ -113,8 +119,8 @@ export default function Dashboard() {
   };
 
   const loadCompanyStatuses = async (list) => {
-    // ✅ maintenant: SUPER_ADMIN -> calc status pour كل الشركات
-    // ADMIN -> calc status للشركة الوحيدة
+    // ✅ SUPER_ADMIN -> calc status pour كل الشركات
+    // ✅ ADMIN -> calc status للشركة الوحيدة
     if (!isAdmin) return;
 
     try {
@@ -205,33 +211,75 @@ export default function Dashboard() {
     return (
       <div className="statusCell">
         <span className={cls}>{label}</span>
-        <span className="statusMeta">
-          {s ? `${s.activeUsers}/${s.totalUsers} enabled` : "…"}
-        </span>
+        <span className="statusMeta">{s ? `${s.activeUsers}/${s.totalUsers} enabled` : "…"}</span>
       </div>
     );
+  };
+
+  // ✅ POST add company (SUPER_ADMIN only)
+  const addCompany = async (e) => {
+    e.preventDefault();
+    if (!isSuperAdmin) return;
+
+    const name = (newCompany.name || "").trim();
+    const code = (newCompany.code || "").trim();
+
+    if (!name) {
+      setAddErr("Name is required.");
+      return;
+    }
+
+    setAdding(true);
+    setAddErr("");
+
+    try {
+      const res = await fetch(API_COMPANIES, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          name,
+          code: code || null,
+          // ✅ si ton backend attend status, décommente:
+          // status: "ACTIVE",
+        }),
+      });
+
+      if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(t || `HTTP ${res.status}`);
+      }
+
+      setOpenAddCompany(false);
+      setNewCompany({ name: "", code: "" });
+      await loadCompanies();
+    } catch (e2) {
+      setAddErr(
+        e2?.message === "UNAUTHORIZED"
+          ? "Session expirée."
+          : e2?.message || "Erreur ajout company."
+      );
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
     <div className="dashWrap">
       <div className="dashTop">
         <div>
-          <div className="dashH1">Dashboard</div>
           <div className="dashCrumb">
             Home <span className="dot">•</span> Account Management
           </div>
         </div>
 
-        <div className="dashTopActions">
-          <div className="userChip">
-            <span className="uDot" />
-            {username} <span className="muted">({roles[0] || "—"})</span>
-          </div>
+        
           <button className="btn ghost" onClick={refreshAll} disabled={loading}>
             ⟳ Refresh
           </button>
         </div>
-      </div>
+      
 
       <div className="kpiGrid">
         <div className="kpiCard">
@@ -270,13 +318,17 @@ export default function Dashboard() {
               <div className="panelTitle">
                 Companies {isSuperAdmin ? "" : <span className="muted">(my company)</span>}
               </div>
-              <div className="panelSub">Enterprise overview & access management</div>
+              <div className="panelSub"></div>
             </div>
 
             <div className="panelTools">
               <div className="search">
                 <span className="sIcon">⌕</span>
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by id, name, code…" />
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search by id, name, code…"
+                />
               </div>
 
               <select className="select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -291,9 +343,14 @@ export default function Dashboard() {
                 <option value={20}>20 / page</option>
               </select>
 
-              <button className="btn" onClick={loadCompanies} disabled={loading}>
-                Refresh
-              </button>
+              {/* ✅ ADD button (SUPER_ADMIN) */}
+              {isSuperAdmin && (
+                <button className="btn primary" onClick={() => { setAddErr(""); setOpenAddCompany(true); }}>
+                  + Add company
+                </button>
+              )}
+
+              
             </div>
           </div>
 
@@ -348,12 +405,8 @@ export default function Dashboard() {
 
                             {openMenuId === c.id && (
                               <div className="menu">
-                                <button className="menuItem" onClick={() => navigate(`/users?companyId=${c.id}`)}>
-                                  Manage users
-                                </button>
-                                <button className="menuItem" onClick={() => navigate(`/users`)}>
-                                  Global users view
-                                </button>
+                                
+                              
                                 <button
                                   className="menuItem danger"
                                   onClick={() => {
@@ -361,7 +414,7 @@ export default function Dashboard() {
                                     alert("Action placeholder: disable company (backend endpoint later)");
                                   }}
                                 >
-                                  Disable company (placeholder)
+                                  Disable company 
                                 </button>
                               </div>
                             )}
@@ -405,6 +458,54 @@ export default function Dashboard() {
                 Last »
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Add Company Modal (SUPER_ADMIN only) */}
+      {isSuperAdmin && openAddCompany && (
+        <div className="modalOverlay" onClick={() => setOpenAddCompany(false)}>
+          <div className="modalCard" onClick={(e) => e.stopPropagation()}>
+            <div className="modalHead">
+              <div className="modalTitle">Add new company</div>
+              <button className="iconKebab" onClick={() => setOpenAddCompany(false)} title="Close">
+                ✕
+              </button>
+            </div>
+
+            {addErr && <div className="alert danger">{addErr}</div>}
+
+            <form onSubmit={addCompany} className="modalForm">
+              <label className="label">Name *</label>
+              <input
+                className="input"
+                value={newCompany.name}
+                onChange={(e) => setNewCompany((p) => ({ ...p, name: e.target.value }))}
+                placeholder=""
+              />
+
+              <label className="label">Code (optional)</label>
+              <input
+                className="input"
+                value={newCompany.code}
+                onChange={(e) => setNewCompany((p) => ({ ...p, code: e.target.value }))}
+                placeholder=""
+              />
+
+              <div className="modalActions">
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => setOpenAddCompany(false)}
+                  disabled={adding}
+                >
+                  Cancel
+                </button>
+                <button className="btn primary" disabled={adding}>
+                  {adding ? "Adding..." : "Add"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

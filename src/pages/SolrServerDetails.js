@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./SolrServerDetails.css";
 
 const API = "http://localhost:8081/api/solr/servers";
 
-function authHeaders() {
+function getAuthHeaders() {
   const token = localStorage.getItem("token");
   return {
     "Content-Type": "application/json",
@@ -31,7 +31,7 @@ function pctTone(v) {
 }
 
 export default function SolrServerDetails() {
-  const { name } = useParams();
+  const { id } = useParams(); // ✅ /solr/server/:id
   const nav = useNavigate();
 
   const [details, setDetails] = useState(null);
@@ -41,51 +41,88 @@ export default function SolrServerDetails() {
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
 
-  const load = async () => {
-    setLoading(true);
-    setErr("");
+  const load = useCallback(
+    async (signal) => {
+      setLoading(true);
+      setErr("");
 
-    try {
-      const h = authHeaders();
-
-      const resDetails = await fetch(`${API}/${encodeURIComponent(name)}`, { headers: h });
-      if (resDetails.status === 401 || resDetails.status === 403) throw new Error("UNAUTHORIZED");
-      if (!resDetails.ok) throw new Error(`HTTP ${resDetails.status}`);
-      const d = await resDetails.json();
-
-      // Health (optionnel)
-      let hl = null;
       try {
-        const resHealth = await fetch(`${API}/${encodeURIComponent(name)}/health`, { headers: h });
-        if (resHealth.ok) hl = await resHealth.json();
-      } catch {
-        hl = null;
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setErr("Session expirée. Reconnecte-toi.");
+          nav("/login", { replace: true });
+          return;
+        }
+
+        if (!id) {
+          setErr("ID serveur manquant (route invalide).");
+          return;
+        }
+
+        const headers = getAuthHeaders();
+
+        // ✅ DETAILS BY ID
+        const resDetails = await fetch(`${API}/${encodeURIComponent(id)}`, {
+          method: "GET",
+          headers,
+          signal,
+        });
+
+        if (resDetails.status === 401) throw new Error("UNAUTHORIZED");
+        if (resDetails.status === 403) throw new Error("FORBIDDEN");
+        if (!resDetails.ok) throw new Error(`HTTP_${resDetails.status}`);
+
+        const d = await resDetails.json();
+
+        // ✅ HEALTH (optionnel)
+        let hl = null;
+        try {
+          const resHealth = await fetch(`${API}/${encodeURIComponent(id)}/health`, {
+            method: "GET",
+            headers,
+            signal,
+          });
+          if (resHealth.status === 401) throw new Error("UNAUTHORIZED");
+          if (resHealth.status === 403) throw new Error("FORBIDDEN");
+          if (resHealth.ok) hl = await resHealth.json();
+        } catch {
+          // ignore (health optionnel)
+        }
+
+        // ✅ CORES
+        const coresArr = Array.isArray(d?.cores) ? d.cores : [];
+
+        setDetails(d);
+        setHealth(hl);
+        setCores(coresArr);
+      } catch (e) {
+        if (e?.name === "AbortError") return;
+
+        setDetails(null);
+        setHealth(null);
+        setCores([]);
+
+        if (e?.message === "UNAUTHORIZED") {
+          setErr("Session expirée. Reconnecte-toi.");
+          localStorage.removeItem("token");
+          nav("/login", { replace: true });
+        } else if (e?.message === "FORBIDDEN") {
+          setErr("Accès refusé : tu n’as pas la permission d’ouvrir ces détails.");
+        } else {
+          setErr("Erreur de chargement serveur.");
+        }
+      } finally {
+        setLoading(false);
       }
-
-      // Cores
-      let coresArr = [];
-      if (Array.isArray(d?.cores)) coresArr = d.cores;
-      else if (Array.isArray(d?.coreStats)) coresArr = d.coreStats;
-      else if (Array.isArray(d?.collections)) coresArr = d.collections;
-
-      setDetails(d);
-      setHealth(hl);
-      setCores(Array.isArray(coresArr) ? coresArr : []);
-    } catch (e) {
-      console.error(e);
-      setDetails(null);
-      setHealth(null);
-      setCores([]);
-      setErr(e?.message === "UNAUTHORIZED" ? "Session expirée. Reconnecte-toi." : "Erreur de chargement serveur.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [id, nav]
+  );
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name]);
+    const controller = new AbortController();
+    load(controller.signal);
+    return () => controller.abort();
+  }, [load]);
 
   const baseUrl = useMemo(() => {
     const host = details?.host ?? "localhost";
@@ -94,37 +131,40 @@ export default function SolrServerDetails() {
     return `http://${host}:${port}`;
   }, [details]);
 
-  const status = (details?.status || health?.status || "—").toUpperCase();
-  const isUp = status === "UP" || status === "OK";
+  // ✅ statut
+  const computedStatus = useMemo(() => {
+    const s1 = String(details?.status ?? "").toUpperCase();
+    const s2 = String(health?.status ?? "").toUpperCase();
+    return s1 === "UP" || s2 === "UP" ? "UP" : "DOWN";
+  }, [details, health]);
+
+  const isUp = computedStatus === "UP";
 
   const cpu = Number(details?.cpu ?? 0);
   const mem = Number(details?.memory ?? 0);
-  const totalDocs = details?.totalDocs ?? details?.docs ?? 0;
-  const totalSize = details?.totalSizeInBytes ?? details?.sizeInBytes ?? 0;
+  const totalDocs = details?.totalDocs ?? 0;
+  const totalSize = details?.totalSizeInBytes ?? 0;
 
   const filteredCores = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return cores;
-
-    return cores.filter((c) => {
-      const coreName = String(c?.name ?? c?.core ?? "").toLowerCase();
-      return coreName.includes(s);
-    });
+    return cores.filter((c) => String(c?.name ?? "").toLowerCase().includes(s));
   }, [cores, q]);
 
   const copy = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
-  // ✅ CORES -> SOLR SCHEMA
+  // ✅ CLICK CORE -> ouvre schema
   const goToSchema = (coreName) => {
     const cn = String(coreName || "").trim();
     if (!cn || cn === "—") return;
-    nav(`/solr-schema?server=${encodeURIComponent(name)}&core=${encodeURIComponent(cn)}`);
+
+    nav(
+      `/solr-schema?serverId=${encodeURIComponent(id)}&core=${encodeURIComponent(cn)}`
+    );
   };
 
   return (
@@ -141,8 +181,10 @@ export default function SolrServerDetails() {
           </div>
 
           <div className="srvTitleRow">
-            <h1 className="srvTitle">{name}</h1>
-            <span className={`badge ${isUp ? "ok" : "down"}`}>{isUp ? "UP" : "DOWN"}</span>
+            <h1 className="srvTitle">{details?.name ?? `Server #${id}`}</h1>
+            <span className={`badge ${isUp ? "ok" : "down"}`}>
+              {isUp ? "UP" : "DOWN"}
+            </span>
             {baseUrl && (
               <span className="chip mono" title={baseUrl}>
                 {baseUrl}
@@ -150,16 +192,29 @@ export default function SolrServerDetails() {
             )}
           </div>
 
-          <div className="srvSub">Monitoring détaillé du serveur (CPU, mémoire, cores, état de santé).</div>
+          <div className="srvSub">
+            Monitoring détaillé du serveur (CPU, mémoire, cores, santé).
+          </div>
         </div>
 
         <div className="srvHeaderRight">
           {baseUrl && (
-            <button className="btn ghost" onClick={() => copy(baseUrl)} title="Copier l’URL">
+            <button
+              className="btn ghost"
+              onClick={() => copy(baseUrl)}
+              title="Copier l’URL"
+            >
               Copy URL
             </button>
           )}
-          <button className="btn" onClick={load} disabled={loading}>
+          <button
+            className="btn"
+            onClick={() => {
+              const controller = new AbortController();
+              load(controller.signal);
+            }}
+            disabled={loading}
+          >
             {loading ? "Loading…" : "Refresh"}
           </button>
         </div>
@@ -175,7 +230,10 @@ export default function SolrServerDetails() {
             <div className={`kpiTag ${pctTone(cpu)}`}>{cpu}%</div>
           </div>
           <div className="bar">
-            <div className={`barFill ${pctTone(cpu)}`} style={{ width: `${Math.min(100, Math.max(0, cpu))}%` }} />
+            <div
+              className={`barFill ${pctTone(cpu)}`}
+              style={{ width: `${Math.min(100, Math.max(0, cpu))}%` }}
+            />
           </div>
           <div className="kpiHint">Utilisation processeur</div>
         </div>
@@ -186,7 +244,10 @@ export default function SolrServerDetails() {
             <div className={`kpiTag ${pctTone(mem)}`}>{mem}%</div>
           </div>
           <div className="bar">
-            <div className={`barFill ${pctTone(mem)}`} style={{ width: `${Math.min(100, Math.max(0, mem))}%` }} />
+            <div
+              className={`barFill ${pctTone(mem)}`}
+              style={{ width: `${Math.min(100, Math.max(0, mem))}%` }}
+            />
           </div>
           <div className="kpiHint">Utilisation mémoire</div>
         </div>
@@ -208,9 +269,8 @@ export default function SolrServerDetails() {
         </div>
       </div>
 
-      {/* PANELS */}
+      {/* INFO + HEALTH */}
       <div className="grid2">
-        {/* Info */}
         <div className="panel">
           <div className="panelHead">
             <div>
@@ -224,27 +284,21 @@ export default function SolrServerDetails() {
               <div className="k">Host</div>
               <div className="v mono">{details?.host ?? "—"}</div>
             </div>
-
             <div className="infoItem">
               <div className="k">Port</div>
               <div className="v">{details?.port ?? "—"}</div>
             </div>
-
             <div className="infoItem">
               <div className="k">Status</div>
               <div className="v">
-                <span className={`pill ${isUp ? "ok" : "down"}`}>{isUp ? "UP" : "DOWN"}</span>
+                <span className={`pill ${isUp ? "ok" : "down"}`}>
+                  {isUp ? "UP" : "DOWN"}
+                </span>
               </div>
-            </div>
-
-            <div className="infoItem">
-              <div className="k">Generated at</div>
-              <div className="v mono">{details?.generatedAt ?? health?.generatedAt ?? "—"}</div>
             </div>
           </div>
         </div>
 
-        {/* Health */}
         <div className="panel">
           <div className="panelHead">
             <div>
@@ -256,25 +310,25 @@ export default function SolrServerDetails() {
           <div className="healthGrid">
             <div className="healthItem">
               <div className="k">Response time</div>
-              <div className="v">{health?.responseTimeMs != null ? `${health.responseTimeMs} ms` : "—"}</div>
+              <div className="v">
+                {health?.responseTimeMs != null ? `${health.responseTimeMs} ms` : "—"}
+              </div>
             </div>
-
             <div className="healthItem">
               <div className="k">Ping</div>
               <div className="v">
-                <span className={`pill ${isUp ? "ok" : "down"}`}>{isUp ? "OK" : "FAIL"}</span>
+                <span className={`pill ${isUp ? "ok" : "down"}`}>
+                  {isUp ? "OK" : "FAIL"}
+                </span>
               </div>
             </div>
-
             <div className="healthItem">
               <div className="k">Message</div>
-              <div className="v">{health?.message ?? (isUp ? "Healthy" : "Unreachable")}</div>
+              <div className="v">
+                {health?.message ?? (isUp ? "Healthy" : "Unreachable")}
+              </div>
             </div>
           </div>
-
-          {Array.isArray(health?.alerts) && health.alerts.length > 0 && (
-            <div className="notice warn">⚠️ {health.alerts.join(", ")}</div>
-          )}
         </div>
       </div>
 
@@ -289,7 +343,11 @@ export default function SolrServerDetails() {
           <div className="rightTools">
             <div className="searchBox">
               <span>⌕</span>
-              <input placeholder="Search core…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <input
+                placeholder="Search core…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
             </div>
             <div className="chip">
               {filteredCores.length} / {cores.length}
@@ -309,11 +367,7 @@ export default function SolrServerDetails() {
             </thead>
             <tbody>
               {filteredCores.map((c) => {
-                const coreName = c?.name ?? c?.core ?? "—";
-                const docs = c?.numDocs ?? c?.docs ?? 0;
-                const del = c?.deletedDocs ?? c?.deleted ?? 0;
-                const size = c?.sizeInBytes ?? c?.size ?? 0;
-
+                const coreName = c?.name ?? "—";
                 return (
                   <tr
                     key={coreName}
@@ -326,10 +380,10 @@ export default function SolrServerDetails() {
                     }}
                     title="Ouvrir Solr Schema"
                   >
-                    <td className="mono coreLinkCell">{coreName}</td>
-                    <td className="right">{docs}</td>
-                    <td className="right">{del}</td>
-                    <td className="right">{formatBytes(size)}</td>
+                    <td className="mono">{coreName}</td>
+                    <td className="right">{c.numDocs ?? 0}</td>
+                    <td className="right">{c.deletedDocs ?? 0}</td>
+                    <td className="right">{formatBytes(c.sizeInBytes ?? 0)}</td>
                   </tr>
                 );
               })}
