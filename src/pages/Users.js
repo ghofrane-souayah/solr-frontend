@@ -1,14 +1,11 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import "./Users.css";
-
-const API = "http://localhost:8081/api/users";
+import { api } from "../services/api";
 
 function getRoles() {
   try {
-    const raw = localStorage.getItem("roles");
-    const arr = raw ? JSON.parse(raw) : [];
-    return (Array.isArray(arr) ? arr : [])
+    const roles = JSON.parse(localStorage.getItem("roles") || "[]");
+    return (Array.isArray(roles) ? roles : [])
       .map((r) => String(r || "").replace("ROLE_", "").toUpperCase())
       .filter(Boolean);
   } catch {
@@ -16,546 +13,512 @@ function getRoles() {
   }
 }
 
-function getAuthHeaders() {
-  const token = localStorage.getItem("token");
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
-function roleBadge(role) {
-  const r = String(role || "").toUpperCase();
-  if (r.includes("SUPER")) return "badge badgePurple";
-  if (r.includes("ADMIN")) return "badge badgeBlue";
-  return "badge badgeGray";
-}
-function enabledBadge(enabled) {
-  return enabled ? "badge badgeGreen" : "badge badgeRed";
-}
-
-export default function Users() {
-  const nav = useNavigate();
-  const [params] = useSearchParams();
-
-  const companyIdRaw = params.get("companyId");
-  const companyId = companyIdRaw && String(companyIdRaw).trim() !== "" ? String(companyIdRaw).trim() : null;
-
+export default function UsersPage() {
   const roles = useMemo(() => getRoles(), []);
   const isSuperAdmin = roles.includes("SUPER_ADMIN");
   const isAdmin = roles.includes("ADMIN") || isSuperAdmin;
-  const username = useMemo(() => localStorage.getItem("username") || "—", []);
 
-  const headers = useMemo(() => getAuthHeaders(), []);
-
-  // data
+  const [companies, setCompanies] = useState([]);
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState(null);
 
-  // modal
-  const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState("add");
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingUserId, setEditingUserId] = useState(null);
+  const [userToDelete, setUserToDelete] = useState(null);
+
   const [form, setForm] = useState({
-    id: null,
     username: "",
     email: "",
-    role: "USER",
-    enabled: true,
     password: "",
+    role: "USER",
+    companyId: "",
   });
-useEffect(() => {
-  if (open) {
-    document.body.style.overflow = "hidden";
-  } else {
-    document.body.style.overflow = "auto";
-  }
-}, [open]);
 
-  // ✅ enterprise table controls
-  const [q, setQ] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL"); // ALL | ACTIVE | INACTIVE
-  const [rowsPerPage, setRowsPerPage] = useState(8);
-  const [page, setPage] = useState(1);
-
-  // ✅ quick actions menu
-  const [openMenuId, setOpenMenuId] = useState(null);
-  const menuRef = useRef(null);
-
-  useEffect(() => {
-    const onClick = (e) => {
-      if (!menuRef.current) return;
-      if (!menuRef.current.contains(e.target)) setOpenMenuId(null);
-    };
-    window.addEventListener("mousedown", onClick);
-    return () => window.removeEventListener("mousedown", onClick);
-  }, []);
-
-  const buildListUrl = useCallback(() => {
-    if (isSuperAdmin && companyId) return `${API}?companyId=${encodeURIComponent(companyId)}`;
-    return API;
-  }, [isSuperAdmin, companyId]);
-
-  const load = useCallback(async () => {
-    if (!isAdmin) {
-      setUsers([]);
-      setError("Accès refusé (admin requis) ou session expirée.");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(buildListUrl(), { headers });
-      if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setUsers(Array.isArray(data) ? data : []);
-      setPage(1);
-    } catch (e) {
-      setUsers([]);
-      setError(e?.message === "UNAUTHORIZED" ? "Session expirée." : "Erreur chargement users.");
-    } finally {
-      setLoading(false);
-    }
-  }, [isAdmin, buildListUrl, headers]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // ✅ KPIs
-  const kpis = useMemo(() => {
-    const total = users.length;
-    const actives = users.filter((u) => u.enabled).length;
-    const inactives = total - actives;
-    return { total, actives, inactives };
-  }, [users]);
-
-  // ✅ filter + search
-  const filtered = useMemo(() => {
-    const norm = q.trim().toLowerCase();
-    return users.filter((u) => {
-      const enabled = !!u.enabled;
-      const pass =
-        statusFilter === "ALL" ||
-        (statusFilter === "ACTIVE" && enabled) ||
-        (statusFilter === "INACTIVE" && !enabled);
-
-      if (!pass) return false;
-      if (!norm) return true;
-
-      const roleStr = (u.role?.name || u.role || "").toString().toLowerCase();
-      return (
-        String(u.username || "").toLowerCase().includes(norm) ||
-        String(u.email || "").toLowerCase().includes(norm) ||
-        roleStr.includes(norm)
-      );
-    });
-  }, [users, q, statusFilter]);
-
-  // ✅ pagination
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / rowsPerPage)), [filtered.length, rowsPerPage]);
-  const paged = useMemo(() => {
-    const start = (page - 1) * rowsPerPage;
-    return filtered.slice(start, start + rowsPerPage);
-  }, [filtered, page, rowsPerPage]);
-
-  useEffect(() => setPage(1), [q, statusFilter, rowsPerPage]);
-
-  const openAdd = () => {
-    setMode("add");
-    setForm({ id: null, username: "", email: "", role: "USER", enabled: true, password: "" });
-    setOpen(true);
+  const resetMessages = () => {
+    setErrorMsg("");
+    setSuccessMsg("");
   };
 
-  const openEdit = (u) => {
-    const role = String(u.role?.name || u.role || "USER").replace("ROLE_", "").toUpperCase();
-    setMode("edit");
+  const resetForm = (companyId = "") => {
     setForm({
-      id: u.id,
-      username: u.username || "",
-      email: u.email || "",
-      role,
-      enabled: u.enabled ?? true,
+      username: "",
+      email: "",
       password: "",
+      role: "USER",
+      companyId: companyId || "",
     });
-    setOpen(true);
+    setEditingUserId(null);
   };
 
-  const submit = async () => {
-    if (!isAdmin) return;
+  const loadCompaniesForSuperAdmin = async () => {
+    setLoadingCompanies(true);
+    resetMessages();
 
-    const usernameV = form.username.trim();
-    const emailV = form.email.trim();
+    try {
+      const data = await api("/api/companies");
+      const items = Array.isArray(data) ? data : data?.items ?? data?.data ?? [];
+      setCompanies(items);
+    } catch (error) {
+      console.error(error);
+      setErrorMsg("Erreur lors du chargement des compagnies.");
+    } finally {
+      setLoadingCompanies(false);
+    }
+  };
 
-    if (!usernameV || !emailV) {
-      setError("Username et Email sont obligatoires.");
+  const loadMyCompanyForAdmin = async () => {
+    setLoadingCompanies(true);
+    resetMessages();
+
+    try {
+      const company = await api("/api/companies/me");
+
+      if (company) {
+        setCompanies([company]);
+        setSelectedCompanyId(String(company.id));
+        setSelectedCompany(company);
+        resetForm(String(company.id));
+      }
+    } catch (error) {
+      console.error(error);
+      setErrorMsg("Erreur lors du chargement de la compagnie.");
+    } finally {
+      setLoadingCompanies(false);
+    }
+  };
+
+  const loadUsers = async (companyId) => {
+    if (!companyId) {
+      setUsers([]);
       return;
     }
 
-    setLoading(true);
-    setError("");
-    try {
-      const payload = {
-        username: usernameV,
-        email: emailV,
-        password: form.password,
-        role: form.role,
-        enabled: form.enabled,
-        ...(isSuperAdmin && companyId ? { companyId: Number(companyId) } : {}),
-      };
+    setLoadingUsers(true);
+    resetMessages();
 
-      if (mode === "add") {
-        const res = await fetch(API, { method: "POST", headers, body: JSON.stringify(payload) });
-        if (!res.ok) throw new Error(`POST ${res.status}`);
+    try {
+      const data = await api(`/api/users?companyId=${companyId}`);
+      const items = Array.isArray(data) ? data : data?.items ?? data?.data ?? [];
+      setUsers(items);
+    } catch (error) {
+      console.error(error);
+      setErrorMsg("Erreur lors du chargement des utilisateurs.");
+      setUsers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      loadCompaniesForSuperAdmin();
+    } else if (isAdmin) {
+      loadMyCompanyForAdmin();
+    }
+  }, [isSuperAdmin, isAdmin]);
+
+  useEffect(() => {
+    if (!selectedCompanyId) {
+      setUsers([]);
+      return;
+    }
+
+    const company =
+      companies.find((c) => String(c.id) === String(selectedCompanyId)) || null;
+
+    setSelectedCompany(company);
+    setForm((prev) => ({
+      ...prev,
+      companyId: String(selectedCompanyId),
+    }));
+
+    loadUsers(selectedCompanyId);
+  }, [selectedCompanyId, companies]);
+
+  const handleCompanyClick = (company) => {
+    setSelectedCompanyId(String(company.id));
+    setSelectedCompany(company);
+    setShowForm(false);
+    resetMessages();
+    resetForm(String(company.id));
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const openCreateForm = () => {
+    resetMessages();
+    resetForm(selectedCompanyId);
+    setShowForm(true);
+  };
+
+  const openEditForm = (user) => {
+    resetMessages();
+    setEditingUserId(user.id);
+    setForm({
+      username: user.username ?? "",
+      email: user.email ?? "",
+      password: "",
+      role: user.role ?? "USER",
+      companyId: String(selectedCompanyId || ""),
+    });
+    setShowForm(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    resetMessages();
+
+    const companyIdToUse = form.companyId || selectedCompanyId;
+
+    if (!companyIdToUse) {
+      setErrorMsg("Tu dois choisir une compagnie.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      if (editingUserId) {
+        await api(`/api/users/${editingUserId}`, {
+          method: "PUT",
+          body: {
+            username: form.username,
+            email: form.email,
+            password: form.password || undefined,
+            role: form.role,
+            companyId: Number(companyIdToUse),
+          },
+        });
+
+        setSuccessMsg("Utilisateur modifié avec succès.");
       } else {
-        const res = await fetch(`${API}/${form.id}`, { method: "PUT", headers, body: JSON.stringify(payload) });
-        if (!res.ok) throw new Error(`PUT ${res.status}`);
+        await api("/api/users", {
+          method: "POST",
+          body: {
+            username: form.username,
+            email: form.email,
+            password: form.password,
+            role: form.role,
+            companyId: Number(companyIdToUse),
+          },
+        });
+
+        setSuccessMsg("Utilisateur créé avec succès.");
       }
 
-      setOpen(false);
-      await load();
-    } catch {
-      setError("Erreur Add/Update.");
+      setShowForm(false);
+      resetForm(companyIdToUse);
+      await loadUsers(companyIdToUse);
+    } catch (error) {
+      console.error(error);
+      setErrorMsg(
+        editingUserId
+          ? "Erreur lors de la modification de l'utilisateur."
+          : "utilisateur existe déja."
+      );
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const remove = async (id) => {
-    if (!isAdmin) return;
-    if (!window.confirm("Supprimer cet utilisateur ?")) return;
+  const openDeleteConfirm = (user) => {
+    setUserToDelete(user);
+  };
 
-    setLoading(true);
-    setError("");
+  const closeDeleteConfirm = () => {
+    setUserToDelete(null);
+  };
+
+  const handleDelete = async () => {
+    if (!userToDelete) return;
+
+    resetMessages();
+
     try {
-      const res = await fetch(`${API}/${id}`, { method: "DELETE", headers });
-      if (!res.ok) throw new Error(`DELETE ${res.status}`);
-      await load();
-    } catch {
-      setError("Erreur suppression.");
-    } finally {
-      setLoading(false);
+      await api(`/api/users/${userToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      setSuccessMsg("Utilisateur supprimé avec succès.");
+      setUserToDelete(null);
+      await loadUsers(selectedCompanyId);
+    } catch (error) {
+      console.error(error);
+      setErrorMsg("Erreur lors de la suppression de l'utilisateur.");
     }
   };
 
-  const toggleEnabled = async (u) => {
-    // ✅ simple: update enabled (reutilise PUT)
-    setLoading(true);
-    setError("");
-    try {
-      const payload = {
-        username: u.username,
-        email: u.email,
-        role: String(u.role?.name || u.role || "USER").replace("ROLE_", "").toUpperCase(),
-        enabled: !u.enabled,
-        password: "",
-        ...(isSuperAdmin && companyId ? { companyId: Number(companyId) } : {}),
-      };
-
-      const res = await fetch(`${API}/${u.id}`, { method: "PUT", headers, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error(`PUT ${res.status}`);
-      await load();
-    } catch {
-      setError("Erreur changement status.");
-    } finally {
-      setLoading(false);
-      setOpenMenuId(null);
-    }
-  };
-
-  const scopeLabel = isSuperAdmin ? (companyId ? `Company #${companyId}` : "Global") : "My company";
+  const canShowUsers = !!selectedCompanyId;
+  const companyLabel = selectedCompany?.name || "Aucune compagnie sélectionnée";
 
   return (
-    <div className="usersWrap">
-      {/* ✅ Corporate header */}
-     <div className="usersTop">
-  <div>
-    <div className="usersCrumb">
-      Home <span className="dot">•</span> Account Management <span className="dot">•</span>{" "}
-      <span className="muted">{scopeLabel}</span>
-    </div>
-  </div>
-
-  <div className="usersTopActions">
-    <button className="btn ghost" onClick={load} disabled={loading || !isAdmin}>
-      ⟳ Refresh
-    </button>
-
-    {isAdmin && (
-      <button className="btn primary" onClick={openAdd} disabled={loading}>
-        + Add user
-      </button>
-    )}
-  </div>
-</div>
-      
-
-     {error && <div className="alert danger">{error}</div>}
-      {!error && loading && <div className="alert">Loading…</div>}
-
-      {/* ✅ KPI */}
-      <div className="kpiGrid">
-        <div className="kpiCard">
-          <div className="kpiTop">
-            <div className="kpiLabel">Total</div>
-            <div className="kpiIcon">👥</div>
-          </div>
-          <div className="kpiValue">{kpis.total}</div>
-          <div className="kpiHint">Users in this scope</div>
+    <div className="usersPage">
+      <div className="usersTop">
+        <div>
+        
+         
+          <p className="usersSub">
+            {isSuperAdmin
+              ? "Sélectionne une compagnie pour afficher et gérer ses utilisateurs."
+              : "Gère les utilisateurs de ta compagnie."}
+          </p>
         </div>
 
-        <div className="kpiCard">
-          <div className="kpiTop">
-            <div className="kpiLabel">Active</div>
-            <div className="kpiIcon">✅</div>
-          </div>
-          <div className="kpiValue">{kpis.actives}</div>
-          <div className="kpiHint">Enabled accounts</div>
-        </div>
+        <div className="usersTopActions">
+          <button
+            className="btn ghost sm"
+            onClick={() => selectedCompanyId && loadUsers(selectedCompanyId)}
+            disabled={!selectedCompanyId || loadingUsers}
+            type="button"
+          >
+            {loadingUsers ? "Chargement..." : "Actualiser"}
+          </button>
 
-        <div className="kpiCard">
-          <div className="kpiTop">
-            <div className="kpiLabel">Inactive</div>
-            <div className="kpiIcon">⛔</div>
-          </div>
-          <div className="kpiValue">{kpis.inactives}</div>
-          <div className="kpiHint">Disabled accounts</div>
+          <button
+            className="btn primary sm"
+            onClick={openCreateForm}
+            disabled={!selectedCompanyId}
+            type="button"
+          >
+            Nouvel utilisateur
+          </button>
         </div>
       </div>
 
-      {/* ✅ Toolbar */}
-      <div className="panel">
-        <div className="panelHead">
-          <div>
-            <div className="panelTitle">User directory</div>
-            <div className="panelSub">Search, filter and manage access</div>
-          </div>
+      {errorMsg && <div className="usersMessage error">{errorMsg}</div>}
+      {successMsg && <div className="usersMessage success">{successMsg}</div>}
 
-          <div className="panelTools">
-            <div className="search">
-              <span className="sIcon">⌕</span>
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search username, email, role…" />
-            </div>
+      <div className="usersLayout">
+        <aside className="companiesPanel">
+          <div className="panelTitle">Compagnies</div>
 
-            <select className="select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="ALL">All</option>
-              <option value="ACTIVE">Active only</option>
-              <option value="INACTIVE">Inactive only</option>
-            </select>
+          {loadingCompanies ? (
+            <div className="panelEmpty">Chargement des compagnies...</div>
+          ) : companies.length === 0 ? (
+            <div className="panelEmpty">Aucune compagnie trouvée.</div>
+          ) : (
+            <div className="companyList">
+              {companies.map((company) => {
+                const active = String(company.id) === String(selectedCompanyId);
 
-            <select className="select" value={rowsPerPage} onChange={(e) => setRowsPerPage(Number(e.target.value))}>
-              <option value={8}>8 / page</option>
-              <option value={12}>12 / page</option>
-              <option value={20}>20 / page</option>
-            </select>
-          </div>
-        </div>
-
-        {/* ✅ Table */}
-        <div className="tableCard">
-          <table className="eTable">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th className="right">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {paged.map((u) => {
-                const roleText = String(u.role?.name || u.role || "USER").replace("ROLE_", "").toUpperCase();
                 return (
-                  <tr key={u.id}>
-                    <td>
-                      <div className="uCell">
-                        <div className="avatarSm">{(u.username || "U")[0]?.toUpperCase()}</div>
-                        <div>
-                          <div className="uName">{u.username}</div>
-                          <div className="uMeta mono">ID: {u.id}</div>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td>{u.email}</td>
-
-                    <td>
-                      <span className={roleBadge(roleText)}>{roleText}</span>
-                    </td>
-
-                    <td>
-                      <span className={enabledBadge(u.enabled)}>{u.enabled ? "Enabled" : "Disabled"}</span>
-                    </td>
-
-                    <td className="right">
-                      <div className="rowActions">
-                        <button className="btn sm primary" onClick={() => openEdit(u)} disabled={loading}>
-                          Edit
-                        </button>
-
-                        <div className="menuWrap" ref={openMenuId === u.id ? menuRef : null}>
-                          <button
-                            className="iconKebab"
-                            onClick={() => setOpenMenuId((v) => (v === u.id ? null : u.id))}
-                            title="Quick actions"
-                          >
-                            ⋯
-                          </button>
-
-                          {openMenuId === u.id && (
-                            <div className="menu">
-                              <button className="menuItem" onClick={() => toggleEnabled(u)}>
-                                {u.enabled ? "Disable user" : "Enable user"}
-                              </button>
-                              <button className="menuItem" onClick={() => openEdit(u)}>
-                                Edit details
-                              </button>
-                              <button className="menuItem danger" onClick={() => remove(u.id)}>
-                                Delete user
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
+                  <button
+                    key={company.id}
+                    type="button"
+                    className={`companyItem ${active ? "active" : ""}`}
+                    onClick={() => handleCompanyClick(company)}
+                  >
+                    <div className="companyName">{company.name}</div>
+                    <div className="companyCode">{company.code}</div>
+                  </button>
                 );
               })}
+            </div>
+          )}
+        </aside>
 
-              {paged.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={5} className="emptyRow">
-                    No users found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* ✅ Pagination */}
-        <div className="panelFoot">
-          <div className="muted">
-            {filtered.length} result(s) • page {page}/{Math.max(1, Math.ceil(filtered.length / rowsPerPage))}
+        <section className="usersPanel">
+          <div className="panelTitle">
+            {canShowUsers ? `Utilisateurs - ${companyLabel}` : "Utilisateurs"}
           </div>
 
-          <div className="pager">
-            <button className="btn sm ghost" disabled={page <= 1} onClick={() => setPage(1)}>
-              « First
-            </button>
-            <button className="btn sm ghost" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              ‹ Prev
-            </button>
+          {!canShowUsers && isSuperAdmin && (
+            <div className="panelEmpty">
+              Sélectionne une compagnie pour voir les utilisateurs.
+            </div>
+          )}
 
-            <span className="pagePill">{page}</span>
+          {showForm && canShowUsers && (
+            <form className="userForm" onSubmit={handleSubmit}>
+              <div className="formGrid">
+                <div className="formField">
+                  <label>Username</label>
+                  <input
+                    name="username"
+                    value={form.username}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
 
-            <button
-              className="btn sm ghost"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next ›
-            </button>
-            <button className="btn sm ghost" disabled={page >= totalPages} onClick={() => setPage(totalPages)}>
-              Last »
-            </button>
+                <div className="formField">
+                  <label>Email</label>
+                  <input
+                    name="email"
+                    type="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <div className="formField">
+                  <label>Mot de passe</label>
+                  <input
+                    name="password"
+                    type="password"
+                    value={form.password}
+                    onChange={handleChange}
+                    placeholder={editingUserId ? "Laisser vide si inchangé" : ""}
+                    required={!editingUserId}
+                  />
+                </div>
+
+                <div className="formField">
+                  <label>Rôle</label>
+                  <select
+                    name="role"
+                    value={form.role}
+                    onChange={handleChange}
+                  >
+                    <option value="USER">USER</option>
+                    <option value="ADMIN">ADMIN</option>
+                  </select>
+                </div>
+
+                <div className="formField">
+                  <label>Compagnie</label>
+                  <select
+                    name="companyId"
+                    value={form.companyId}
+                    onChange={handleChange}
+                    required
+                    disabled={!isSuperAdmin}
+                  >
+                    <option value="">Choisir une compagnie</option>
+                    {companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="formActions">
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm(selectedCompanyId);
+                    resetMessages();
+                  }}
+                >
+                  Annuler
+                </button>
+
+                <button type="submit" className="btn primary" disabled={saving}>
+                  {saving
+                    ? editingUserId
+                      ? "Modification..."
+                      : "Création..."
+                    : editingUserId
+                    ? "Modifier utilisateur"
+                    : "Créer utilisateur"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {canShowUsers && loadingUsers ? (
+            <div className="panelEmpty">Chargement des utilisateurs...</div>
+          ) : canShowUsers && users.length === 0 ? (
+            <div className="panelEmpty">Aucun utilisateur dans cette compagnie.</div>
+          ) : canShowUsers ? (
+            <div className="usersTableWrap">
+              <table className="usersTable">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Rôle</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((user) => (
+                    <tr key={user.id}>
+                      <td>{user.id}</td>
+                      <td>{user.username ?? "-"}</td>
+                      <td>{user.email ?? "-"}</td>
+                      <td>{user.role ?? "-"}</td>
+                      <td>{user.active ? "Actif" : "Inactif"}</td>
+                      <td>
+                        <div className="tableActions">
+                          <button
+                            className="btn ghost sm"
+                            onClick={() => openEditForm(user)}
+                            type="button"
+                          >
+                            Modifier
+                          </button>
+                          <button
+                            className="btn danger sm"
+                            onClick={() => openDeleteConfirm(user)}
+                            type="button"
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
+      </div>
+
+      {userToDelete && (
+        <div className="logoutModalOverlay" onClick={closeDeleteConfirm}>
+          <div
+            className="logoutModal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="logoutModalTitle">Confirmation</div>
+            <div className="logoutModalText">
+              Voulez-vous vraiment supprimer l'utilisateur{" "}
+              <strong>{userToDelete.username}</strong> ?
+            </div>
+
+            <div className="logoutModalActions">
+              <button
+                type="button"
+                className="modalBtn ghost"
+                onClick={closeDeleteConfirm}
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                className="modalBtn danger"
+                onClick={handleDelete}
+              >
+                Supprimer
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* ✅ Modal (ton modal existant) */}
-     {open && (
-  <div className="modalOverlay" onMouseDown={() => setOpen(false)}>
-    <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-      <div className="modalHead">
-        <h3 className="modalTitle">{mode === "add" ? "Add user" : "Edit user"}</h3>
-
-        <button
-          type="button"
-          className="modalClose"
-          onClick={() => setOpen(false)}
-        >
-          ✕
-        </button>
-      </div>
-
-      <div className="modalBody">
-        <div className="modalField">
-          <label className="label">Username</label>
-          <input
-            className="input"
-            value={form.username}
-            onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
-            placeholder="Enter username"
-          />
-        </div>
-
-        <div className="modalField">
-          <label className="label">Email</label>
-          <input
-            className="input"
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-            placeholder="Enter email"
-          />
-        </div>
-
-        <div className="modalField">
-          <label className="label">Role</label>
-          <select
-            className="select"
-            value={form.role}
-            onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
-          >
-            <option value="ADMIN">ADMIN</option>
-            <option value="USER">USER</option>
-            {isSuperAdmin && <option value="SUPER_ADMIN">SUPER_ADMIN</option>}
-          </select>
-        </div>
-
-        <div className="modalField">
-          <label className="label">Status</label>
-          <select
-            className="select"
-            value={form.enabled ? "true" : "false"}
-            onChange={(e) => setForm((p) => ({ ...p, enabled: e.target.value === "true" }))}
-          >
-            <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
-          </select>
-        </div>
-
-        <div className="modalField">
-          <label className="label">
-            Password {mode === "edit" ? "(leave empty to keep)" : ""}
-          </label>
-          <input
-            className="input"
-            type="password"
-            value={form.password}
-            onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-            placeholder={mode === "edit" ? "Leave empty to keep current password" : "Enter password"}
-          />
-        </div>
-      </div>
-
-      <div className="modalFoot">
-        <button type="button" className="btn ghost" onClick={() => setOpen(false)}>
-          Cancel
-        </button>
-
-        <button type="button" className="btn primary" onClick={submit} disabled={loading}>
-          {mode === "add" ? "Create" : "Save"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      )}
     </div>
   );
 }

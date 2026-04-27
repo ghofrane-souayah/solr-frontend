@@ -1,9 +1,9 @@
-.usersPage,
-.usersPage * {
+.companiesPage,
+.companiesPage * {
   box-sizing: border-box;
 }
 
-.usersPage {
+.companiesPage {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -11,7 +11,7 @@
   color: #111827;
 }
 
-.usersPage .usersTop {
+.companiesPage .companiesTop {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -19,16 +19,16 @@
   flex-wrap: wrap;
 }
 
-.usersPage .usersCrumb {
+.companiesPage .companiesCrumb {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: #494354;
+  color: #8b5cf6;
   margin-bottom: 6px;
 }
 
-.usersPage .usersTitle {
+.companiesPage .companiesTitle {
   margin: 0;
   font-size: 28px;
   line-height: 1.05;
@@ -37,27 +37,41 @@
   letter-spacing: -0.02em;
 }
 
-.usersPage .usersSub {
+.companiesPage .companiesSub {
   margin: 8px 0 0;
   font-size: 13px;
   color: #6b7280;
   line-height: 1.5;
 }
 
-.usersPage .usersTopActions {
+.companiesPage .companiesTopActions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.usersPage .usersLayout {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 16px;
+.companiesPage .companiesMessage {
+  padding: 12px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
 }
 
-.usersPage .companiesPanel,
-.usersPage .usersPanel {
+.companiesPage .companiesMessage.error {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.companiesPage .companiesMessage.success {
+  background: #ecfdf5;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.companiesPage .companiesPanel {
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid #e5e7eb;
   border-radius: 22px;
@@ -66,98 +80,39 @@
   backdrop-filter: blur(10px);
 }
 
-.usersPage .panelTitle {
+.companiesPage .companiesPanelHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eef2f7;
+  flex-wrap: wrap;
+}
+
+.companiesPage .companiesPanelTitle {
   font-size: 16px;
   font-weight: 900;
   color: #111827;
   letter-spacing: -0.01em;
-  margin-bottom: 14px;
 }
 
-.usersPage .panelEmpty {
-  padding: 24px 16px;
-  text-align: center;
+.companiesPage .companiesPanelSub {
+  margin-top: 4px;
   font-size: 13px;
   color: #6b7280;
-  border: 1px dashed #d7deea;
-  border-radius: 16px;
-  background: #fafbfc;
+  line-height: 1.5;
 }
 
-.usersPage .companyList {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.usersPage .companyItem {
-  width: 100%;
-  text-align: left;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.03);
-}
-
-.usersPage .companyItem:hover {
-  transform: translateY(-1px);
-  border-color: #d8dbe3;
-  background: #fbfcff;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);
-}
-
-.usersPage .companyItem.active {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(109, 93, 252, 0.06));
-  border-color: rgba(124, 58, 237, 0.22);
-  box-shadow: 0 12px 24px rgba(124, 58, 237, 0.08);
-}
-
-.usersPage .companyName {
-  font-size: 14px;
-  font-weight: 800;
-  color: #111827;
-}
-
-.usersPage .companyCode {
-  font-size: 12px;
-  color: #6b7280;
-  margin-top: 4px;
-}
-
-.usersPage .userForm {
-  margin-bottom: 16px;
-  border: 1px solid #edf1f5;
-  border-radius: 18px;
-  padding: 16px;
-  background: #fbfcff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
-}
-
-.usersPage .formGrid {
+.companiesPage .companiesForm {
   display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
-  gap: 14px;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
 }
 
-.usersPage .formField {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.usersPage .formField label {
-  font-size: 12px;
-  font-weight: 800;
-  color: #111827;
-  letter-spacing: 0.02em;
-}
-
-.usersPage .formField input,
-.usersPage .formField select {
-  height: 42px;
+.companiesPage .companiesForm input {
+  height: 44px;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
   padding: 0 14px;
@@ -168,39 +123,40 @@
   transition: all 0.2s ease;
 }
 
-.usersPage .formField input::placeholder {
+.companiesPage .companiesForm input::placeholder {
   color: #9ca3af;
 }
 
-.usersPage .formField input:focus,
-.usersPage .formField select:focus {
+.companiesPage .companiesForm input:focus {
   border-color: rgba(37, 99, 235, 0.45);
   box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
 }
 
-.usersPage .formActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 16px;
-  flex-wrap: wrap;
+.companiesPage .companiesEmpty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #6b7280;
+  border: 1px dashed #d7deea;
+  border-radius: 16px;
+  background: #fafbfc;
 }
 
-.usersPage .usersTableWrap {
+.companiesPage .companiesTableWrap {
   overflow-x: auto;
   border-radius: 18px;
   border: 1px solid #edf1f5;
   background: #ffffff;
 }
 
-.usersPage .usersTable {
+.companiesPage .companiesTable {
   width: 100%;
   border-collapse: collapse;
-  min-width: 760px;
+  min-width: 560px;
 }
 
-.usersPage .usersTable th,
-.usersPage .usersTable td {
+.companiesPage .companiesTable th,
+.companiesPage .companiesTable td {
   text-align: left;
   padding: 14px 16px;
   border-bottom: 1px solid #eef2f7;
@@ -208,7 +164,7 @@
   vertical-align: middle;
 }
 
-.usersPage .usersTable th {
+.companiesPage .companiesTable th {
   font-size: 11px;
   font-weight: 900;
   background: #f8fafc;
@@ -217,47 +173,26 @@
   letter-spacing: 0.08em;
 }
 
-.usersPage .usersTable td {
+.companiesPage .companiesTable td {
   color: #111827;
   font-weight: 500;
 }
 
-.usersPage .usersTable tbody tr {
+.companiesPage .companiesTable tbody tr {
   transition: background 0.18s ease;
 }
 
-.usersPage .usersTable tbody tr:hover {
+.companiesPage .companiesTable tbody tr:hover {
   background: #fbfcff;
 }
 
-.usersPage .usersMessage {
-  padding: 12px 14px;
-  border-radius: 16px;
-  font-size: 13px;
-  font-weight: 600;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
-}
-
-.usersPage .usersMessage.error {
-  background: #fef2f2;
-  color: #991b1b;
-  border-color: #fecaca;
-}
-
-.usersPage .usersMessage.success {
-  background: #ecfdf5;
-  color: #166534;
-  border-color: #bbf7d0;
-}
-
-.usersPage .tableActions {
+.companiesPage .tableActions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.usersPage .btn {
+.companiesPage .btn {
   border: 1px solid #e5e7eb;
   background: #ffffff;
   color: #111827;
@@ -271,51 +206,51 @@
   transition: all 0.2s ease;
 }
 
-.usersPage .btn:hover {
+.companiesPage .btn:hover {
   background: #f8fafc;
   transform: translateY(-1px);
 }
 
-.usersPage .btn:disabled {
+.companiesPage .btn:disabled {
   opacity: 0.65;
   cursor: not-allowed;
   transform: none;
 }
 
-.usersPage .btn.primary {
-  background: linear-gradient(135deg, #26375c, #1f3355);
+.companiesPage .btn.primary {
+  background: linear-gradient(135deg, #151039, #141134);
   color: #ffffff;
   border-color: transparent;
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 12px 24px rgba(9, 7, 11, 0.2);
 }
 
-.usersPage .btn.primary:hover {
+.companiesPage .btn.primary:hover {
   filter: brightness(0.98);
-  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
+  box-shadow: 0 14px 28px rgba(8, 7, 11, 0.24);
 }
 
-.usersPage .btn.ghost {
+.companiesPage .btn.ghost {
   background: #ffffff;
   color: #111827;
   border-color: #e5e7eb;
 }
 
-.usersPage .btn.ghost:hover {
+.companiesPage .btn.ghost:hover {
   background: #f8fafc;
 }
 
-.usersPage .btn.danger {
+.companiesPage .btn.danger {
   background: linear-gradient(135deg, #980b0b, #a43131);
   color: #ffffff;
   border-color: transparent;
   box-shadow: 0 12px 24px rgba(17, 24, 39, 0.14);
 }
 
-.usersPage .btn.danger:hover {
+.companiesPage .btn.danger:hover {
   box-shadow: 0 14px 28px rgba(17, 24, 39, 0.2);
 }
 
-.usersPage .btn.sm {
+.companiesPage .btn.sm {
   height: 34px;
   min-height: 34px;
   padding: 0 12px;
@@ -323,7 +258,7 @@
   font-size: 12px;
 }
 
-.usersPage .logoutModalOverlay {
+.companiesPage .logoutModalOverlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.28);
@@ -335,7 +270,7 @@
   z-index: 9999;
 }
 
-.usersPage .logoutModal {
+.companiesPage .logoutModal {
   width: 100%;
   max-width: 390px;
   background: rgba(255, 255, 255, 0.98);
@@ -345,20 +280,20 @@
   box-shadow: 0 30px 60px rgba(15, 23, 42, 0.18);
 }
 
-.usersPage .logoutModalTitle {
+.companiesPage .logoutModalTitle {
   font-size: 18px;
   font-weight: 900;
   color: #111827;
   margin-bottom: 8px;
 }
 
-.usersPage .logoutModalText {
+.companiesPage .logoutModalText {
   font-size: 14px;
   color: #6b7280;
   line-height: 1.6;
 }
 
-.usersPage .logoutModalActions {
+.companiesPage .logoutModalActions {
   margin-top: 18px;
   display: flex;
   justify-content: flex-end;
@@ -366,7 +301,7 @@
   flex-wrap: wrap;
 }
 
-.usersPage .modalBtn {
+.companiesPage .modalBtn {
   min-width: 110px;
   height: 40px;
   padding: 0 14px;
@@ -378,67 +313,70 @@
   transition: all 0.2s ease;
 }
 
-.usersPage .modalBtn.ghost {
+.companiesPage .modalBtn.ghost {
   background: #ffffff;
   color: #111827;
   border-color: #e5e7eb;
 }
 
-.usersPage .modalBtn.ghost:hover {
+.companiesPage .modalBtn.ghost:hover {
   background: #f8fafc;
 }
 
-.usersPage .modalBtn.danger {
+.companiesPage .modalBtn.danger {
   background: linear-gradient(135deg, #111111, #1f2937);
   color: #ffffff;
   border-color: transparent;
 }
 
-.usersPage .modalBtn.danger:hover {
+.companiesPage .modalBtn.danger:hover {
   transform: translateY(-1px);
 }
 
-@media (max-width: 980px) {
-  .usersPage .usersLayout {
+@media (max-width: 900px) {
+  .companiesPage .companiesForm {
     grid-template-columns: 1fr;
   }
 
-  .usersPage .formGrid {
-    grid-template-columns: 1fr;
+  .companiesPage .companiesTop {
+    flex-direction: column;
   }
 }
 
 @media (max-width: 640px) {
-  .usersPage {
+  .companiesPage {
     padding: 4px 0 14px;
   }
 
-  .usersPage .companiesPanel,
-  .usersPage .usersPanel {
+  .companiesPage .companiesPanel {
     padding: 14px;
     border-radius: 18px;
   }
 
-  .usersPage .usersTitle {
+  .companiesPage .companiesTitle {
     font-size: 22px;
   }
 
-  .usersPage .usersTable th,
-  .usersPage .usersTable td {
+  .companiesPage .companiesForm input {
+    height: 40px;
+  }
+
+  .companiesPage .companiesTable th,
+  .companiesPage .companiesTable td {
     padding: 12px;
     font-size: 12px;
   }
 
-  .usersPage .logoutModalActions {
+  .companiesPage .logoutModalActions {
     flex-direction: column;
   }
 
-  .usersPage .modalBtn {
+  .companiesPage .modalBtn {
     width: 100%;
   }
 
-  .usersPage .usersTopActions .btn,
-  .usersPage .formActions .btn {
+  .companiesPage .companiesTopActions .btn,
+  .companiesPage .companiesForm .btn {
     width: 100%;
   }
 }

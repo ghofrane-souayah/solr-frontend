@@ -178,40 +178,6 @@ export default function SolrSchemaPage() {
 
   return (
     <div className="schemaPage">
-      {/* Header */}
-      <div className="schemaTop">
-        <div className="schemaTopLeft">
-          <div className="crumbs">
-            <Link className="crumbLink" to="/solr-cluster">
-              Solr Cluster
-            </Link>
-            <span className="sep">/</span>
-            <span className="crumbCurrent">Schema</span>
-          </div>
-
-          <div className="schemaTitleRow">
-            <h1 className="schemaTitle">Schema</h1>
-            <span className="metaPill">
-              Server: <span className="mono">{serverId || "—"}</span> — Core:{" "}
-              <span className="mono">{core || "—"}</span>
-            </span>
-          </div>
-
-          <div className="schemaSub">
-            Fields, Types 
-          </div>
-        </div>
-
-        <div className="schemaTopRight">
-          <button className="btn ghost" onClick={loadSchema} disabled={!canLoad || loading}>
-            ↻ Refresh
-          </button>
-          <button className="btn" onClick={() => nav("/solr-cluster")}>
-            ← Back
-          </button>
-        </div>
-      </div>
-
       {error && <div className="notice error">❌ {error}</div>}
       {!error && loading && <div className="notice">⏳ Chargement…</div>}
 
@@ -256,7 +222,7 @@ export default function SolrSchemaPage() {
             </div>
 
             <div className="rowsSelect">
-              <span className="muted">Rows</span>
+              <span className="muted">Lignes</span>
               <select value={rows} onChange={onChangeRows}>
                 <option value={10}>10</option>
                 <option value={20}>20</option>
@@ -275,12 +241,12 @@ export default function SolrSchemaPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>NAME</th>
+                  <th>NOM</th>
                   <th>TYPE</th>
-                  <th className="center">STORED</th>
-                  <th className="center">INDEXED</th>
-                  <th className="center">MULTIVALUED</th>
-                  <th className="center">REQUIRED</th>
+                  <th className="center">STOCKÉ</th>
+                  <th className="center">INDEXÉE</th>
+                  <th className="center">MULTIVALUÉ</th>
+                  <th className="center">REQUIS</th>
                 </tr>
               </thead>
               <tbody>
@@ -302,8 +268,8 @@ export default function SolrSchemaPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>NAME</th>
-                  <th>CLASS</th>
+                  <th>NOM</th>
+                  <th>CLASSE</th>
                 </tr>
               </thead>
               <tbody>
@@ -333,28 +299,28 @@ export default function SolrSchemaPage() {
 
           <div className="pagerRight">
             <button className="btn sm ghost" onClick={() => setPage(1)} disabled={page <= 1}>
-              « First
+              « Premier
             </button>
             <button
               className="btn sm ghost"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
             >
-              ‹ Prev
+              ‹ Précedent
             </button>
             <button
               className="btn sm ghost"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
             >
-              Next ›
+              Suivant ›
             </button>
             <button
               className="btn sm ghost"
               onClick={() => setPage(totalPages)}
               disabled={page >= totalPages}
             >
-              Last »
+              Dérnier »
             </button>
           </div>
         </div>

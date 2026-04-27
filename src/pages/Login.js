@@ -10,37 +10,70 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
- const redirectAfterAuth = (roles) => {
-  const normalized = (Array.isArray(roles) ? roles : [])
-    .map((r) => {
-      if (typeof r === "string") return r;
-      if (r?.name) return r.name;
-      if (r?.authority) return r.authority;
-      return "";
-    })
-    .map((r) => String(r || "").replace("ROLE_", "").toUpperCase())
-    .filter(Boolean);
+  const redirectAfterAuth = (roles) => {
+    const normalized = (Array.isArray(roles) ? roles : [])
+      .map((r) => {
+        if (typeof r === "string") return r;
+        if (r?.name) return r.name;
+        if (r?.authority) return r.authority;
+        return "";
+      })
+      .map((r) => String(r || "").replace("ROLE_", "").toUpperCase())
+      .filter(Boolean);
 
-  if (
-    normalized.includes("SUPER_ADMIN") ||
-    normalized.includes("ADMIN") ||
-    normalized.includes("USER")
-  ) {
-    nav("/solr-cluster");
-    return;
-  }
+    if (
+      normalized.includes("SUPER_ADMIN") ||
+      normalized.includes("ADMIN") ||
+      normalized.includes("USER")
+    ) {
+      nav("/solr-cluster");
+      return;
+    }
 
-  nav("/forbidden");
-};
+    nav("/forbidden");
+  };
+
+  const validateEmail = (value) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  };
+
+  const validateForm = () => {
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      return "L'adresse email est obligatoire";
+    }
+
+    if (!validateEmail(cleanEmail)) {
+      return "Veuillez saisir une adresse email valide";
+    }
+
+    if (!password.trim()) {
+      return "Le mot de passe est obligatoire";
+    }
+
+    if (password.length < 6) {
+      return "Le mot de passe doit contenir au moins 6 caractères";
+    }
+
+    return "";
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     try {
+      const validationError = validateForm();
+      if (validationError) {
+        throw new Error(validationError);
+      }
+
       const cleanEmail = email.trim().toLowerCase();
 
       const response = await fetch(`${BASE_URL}/api/auth/login`, {
@@ -69,21 +102,20 @@ export default function Login() {
 
       const token = res?.token;
       if (!token) {
-        console.log("LOGIN RESPONSE =", res);
         throw new Error("Token manquant dans la réponse login");
       }
 
-     const extractedRolesRaw =
-  res?.roles ??
-  res?.role ??
-  res?.authorities ??
-  res?.user?.roles ??
-  res?.user?.role ??
-  [];
+      const extractedRolesRaw =
+        res?.roles ??
+        res?.role ??
+        res?.authorities ??
+        res?.user?.roles ??
+        res?.user?.role ??
+        [];
 
-const roles = Array.isArray(extractedRolesRaw)
-  ? extractedRolesRaw
-  : [extractedRolesRaw];
+      const roles = Array.isArray(extractedRolesRaw)
+        ? extractedRolesRaw
+        : [extractedRolesRaw];
 
       const companyId =
         res?.companyId ??
@@ -126,8 +158,11 @@ const roles = Array.isArray(extractedRolesRaw)
         localStorage.setItem("companyCode", String(companyCode));
       }
 
-      console.log("LOGIN RESPONSE =", res);
-      console.log("companyId saved =", localStorage.getItem("companyId"));
+      if (rememberMe) {
+        localStorage.setItem("rememberEmail", cleanEmail);
+      } else {
+        localStorage.removeItem("rememberEmail");
+      }
 
       redirectAfterAuth(roles);
     } catch (err) {
@@ -152,11 +187,14 @@ const roles = Array.isArray(extractedRolesRaw)
 
         <div className="login-container">
           <h2>Connexion</h2>
+          <p className="login-subtitle">
+            Connectez-vous à votre plateforme de monitoring
+          </p>
 
           <form className="login-form" onSubmit={submit} autoComplete="off">
             <label>EMAIL</label>
             <input
-              type="text"
+              type="email"
               name="email"
               autoComplete="off"
               value={email}
@@ -165,7 +203,17 @@ const roles = Array.isArray(extractedRolesRaw)
               placeholder="admin@company.com"
             />
 
-            <label>PASSWORD</label>
+            <div className="password-label-row">
+              <label>MOT DE PASSE</label>
+              <button
+                type="button"
+                className="forgot-link"
+                onClick={() => nav("/forgot-password")}
+              >
+                Mot de passe oublié?
+              </button>
+              
+            </div>
 
             <div className="password-wrapper">
               <input
@@ -175,7 +223,8 @@ const roles = Array.isArray(extractedRolesRaw)
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                placeholder="••••••••"
+                minLength={6}
+                placeholder="Mot de passe"
               />
 
               <button
@@ -193,19 +242,33 @@ const roles = Array.isArray(extractedRolesRaw)
               </button>
             </div>
 
-            {error && <div className="login-error">{error}</div>}
+            {error && <div className="login-error">{"mot de passe invalide"}</div>}
+
+            <div className="login-options">
+              <label className="remember-me">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                <span>Se souvenir de moi</span>
+              </label>
+            </div>
 
             <button type="submit" className="primary-btn" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? "Connexion..." : "Se connecter"}
             </button>
 
-            <button
-              type="button"
-              className="secondary-btn"
-              onClick={() => nav("/register")}
-            >
-              Créer un compte
-            </button>
+            <p className="signup-text">
+              Vous n'avez pas de compte?{" "}
+              <button
+                type="button"
+                className="signup-link"
+                onClick={() => nav("/register")}
+              >
+                S'inscrire
+              </button>
+            </p>
           </form>
         </div>
       </div>

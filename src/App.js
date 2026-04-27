@@ -16,7 +16,11 @@ import Profile from "./pages/profile";
 import Forbidden from "./components/Forbidden";
 import RequireAuth from "./components/RequireAuth";
 import SolrInstances from "./pages/SolrInstances";
-
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import AlertsPage from "./pages/AlertsPage";
+import Reports from "./pages/Reports";
+import Collections from "./pages/Collections";
 export default function App() {
   return (
     <Routes>
@@ -25,6 +29,8 @@ export default function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/forbidden" element={<Forbidden />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Protected layout */}
       <Route
@@ -108,6 +114,32 @@ export default function App() {
             </RequireAuth>
           }
         />
+
+        <Route
+          path="alerts"
+          element={
+            <RequireAuth allow={["USER", "ADMIN", "SUPER_ADMIN"]}>
+              <AlertsPage />
+            </RequireAuth>
+          }
+        />
+         <Route
+  path="Reports"
+  element={
+    <RequireAuth allow={["USER", "ADMIN", "SUPER_ADMIN"]}>
+      <Reports />
+    </RequireAuth>
+  }
+/>
+<Route
+  path="solr/server/:id/collections"
+  element={
+    <RequireAuth allow={[ "ADMIN", "SUPER_ADMIN"]}>
+      <Collections />
+    </RequireAuth>
+  }
+/>
+       
       </Route>
 
       <Route path="*" element={<Navigate to="/login" replace />} />

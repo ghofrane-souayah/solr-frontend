@@ -1,24 +1,20 @@
+ 
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SolrInstanceApi } from "../api/solrInstanceApi";
-import "./SolrInstances.css";
-
+import "./SolrCluster.css";
 export default function SolrInstances() {
   const navigate = useNavigate();
-
   const [instances, setInstances] = useState([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
-
   const [filter, setFilter] = useState("ALL");
   const [q, setQ] = useState("");
-
   const [showAdd, setShowAdd] = useState(false);
   const [showCopy, setShowCopy] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [selected, setSelected] = useState(null);
-
   const [addForm, setAddForm] = useState({
     name: "",
     host: "",
@@ -27,20 +23,16 @@ export default function SolrInstances() {
     corePath: "",
     imagePath: "",
   });
-
   const [copyForm, setCopyForm] = useState({
     newName: "",
     newPort: "",
   });
-
   const [toast, setToast] = useState(null);
-
   const notify = (type, text) => {
     setToast({ type, text });
     window.clearTimeout(window.__toastTimer);
     window.__toastTimer = window.setTimeout(() => setToast(null), 3000);
   };
-
   const load = async () => {
     setLoading(true);
     setError("");
@@ -54,27 +46,20 @@ export default function SolrInstances() {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     load();
   }, []);
-
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
-
     return instances.filter((x) => {
       const status = (x.status || "").toUpperCase();
-
       if (filter === "UP" && status !== "UP") return false;
       if (filter === "DOWN" && status !== "DOWN") return false;
-
       if (!query) return true;
-
       const hay = `${x.name || ""} ${x.host || ""} ${x.port || ""}`.toLowerCase();
       return hay.includes(query);
     });
   }, [instances, q, filter]);
-
   const resetAddForm = () => {
     setAddForm({
       name: "",
@@ -85,19 +70,16 @@ export default function SolrInstances() {
       imagePath: "",
     });
   };
-
   const resetCopyForm = () => {
     setCopyForm({
       newName: "",
       newPort: "",
     });
   };
-
   const openAdd = () => {
     resetAddForm();
     setShowAdd(true);
   };
-
   const openCopy = (inst) => {
     setSelected(inst);
     setCopyForm({
@@ -106,32 +88,26 @@ export default function SolrInstances() {
     });
     setShowCopy(true);
   };
-
   const openDelete = (inst) => {
     setSelected(inst);
     setShowDelete(true);
   };
-
   const closeAdd = () => {
     setShowAdd(false);
     resetAddForm();
   };
-
   const closeCopy = () => {
     setShowCopy(false);
     setSelected(null);
     resetCopyForm();
   };
-
   const closeDelete = () => {
     setShowDelete(false);
     setSelected(null);
   };
-
   const onAdd = async () => {
     try {
       setActionLoading(true);
-
       await SolrInstanceApi.create({
         name: addForm.name.trim(),
         host: addForm.host.trim(),
@@ -140,7 +116,6 @@ export default function SolrInstances() {
         corePath: addForm.corePath.trim(),
         imagePath: addForm.imagePath.trim(),
       });
-
       closeAdd();
       notify("success", "Instance créée avec succès.");
       await load();
@@ -150,24 +125,19 @@ export default function SolrInstances() {
       setActionLoading(false);
     }
   };
-
 const onCopy = async () => {
   if (!selected) return;
-
   try {
     setActionLoading(true);
-
     await SolrInstanceApi.copy(selected.id, {
       newName: copyForm.newName.trim(),
       newPort: Number(copyForm.newPort),
     });
-
     closeCopy();
     notify("success", "Instance copiée avec succès.");
     await load();
   } catch (e) {
     const msg = e?.message || "Erreur lors de la copie";
-
     if (msg.toLowerCase().includes("port already used")) {
       notify("error", "Le port est déjà utilisé. Choisissez un autre port.");
     } else if (msg.toLowerCase().includes("host + port already exists")) {
@@ -181,15 +151,11 @@ const onCopy = async () => {
     setActionLoading(false);
   }
 };
-
   const onDelete = async () => {
     if (!selected) return;
-
     try {
       setActionLoading(true);
-
       await SolrInstanceApi.remove(selected.id);
-
       closeDelete();
       notify("success", "Instance supprimée avec succès.");
       await load();
@@ -199,10 +165,8 @@ const onCopy = async () => {
       setActionLoading(false);
     }
   };
-
   const onStart = async (inst) => {
     if (!inst?.id) return;
-
     try {
       setActionLoading(true);
       await SolrInstanceApi.start(inst.id);
@@ -214,7 +178,6 @@ const onCopy = async () => {
       setActionLoading(false);
     }
   };
-
   return (
     <div className="entPage">
       <div className="entHeader">
@@ -227,7 +190,6 @@ const onCopy = async () => {
             <div className="entTitle">Instances</div>
           </div>
         </div>
-
         <div className="entHeaderRight">
           <div className="entSearch">
             <span className="entSearchIcon">⌕</span>
@@ -237,7 +199,6 @@ const onCopy = async () => {
               placeholder="Search name, host, port…"
             />
           </div>
-
           <div className="entSeg">
             <button
               className={filter === "ALL" ? "active" : ""}
@@ -258,17 +219,14 @@ const onCopy = async () => {
               Down
             </button>
           </div>
-
           <button className="btnPrimary" onClick={openAdd}>
             New instance
           </button>
-
           <button className="btnGhost" onClick={load} disabled={loading || actionLoading}>
             {loading ? "Refreshing…" : "Refresh"}
           </button>
         </div>
       </div>
-
       {toast && (
         <div className={`entToast ${toast.type}`}>
           <span className="dot" />
@@ -278,9 +236,7 @@ const onCopy = async () => {
           </button>
         </div>
       )}
-
       {error && <div className="entBanner error">❌ {error}</div>}
-
       <div className="entCard">
         <div className="entCardTop">
           <div className="entCardTitle">Registered instances</div>
@@ -288,7 +244,6 @@ const onCopy = async () => {
             Total: <b>{filtered.length}</b>
           </div>
         </div>
-
         <div className="entTableWrap">
           <table className="entTable">
             <thead>
@@ -300,7 +255,6 @@ const onCopy = async () => {
                 <th style={{ width: 320, textAlign: "center" }}>Actions</th>
               </tr>
             </thead>
-
             <tbody>
               {filtered.map((x) => (
                 <tr key={x.id}>
@@ -308,10 +262,8 @@ const onCopy = async () => {
                     <div className="name">{x.name}</div>
                     <div className="sub">ID: {x.id}</div>
                   </td>
-
                   <td className="mono">{x.host}</td>
                   <td className="mono">{x.port}</td>
-
                   <td>
                     <span
                       className={`badge ${
@@ -322,7 +274,6 @@ const onCopy = async () => {
                       {x.status || "UNKNOWN"}
                     </span>
                   </td>
-
                   <td style={{ textAlign: "center" }}>
                     <div className="actionGroup">
                       <button
@@ -332,7 +283,6 @@ const onCopy = async () => {
                       >
                         Start
                       </button>
-
                       <button
                         className="actionBtn copy"
                         onClick={() => openCopy(x)}
@@ -340,7 +290,6 @@ const onCopy = async () => {
                       >
                         Copy
                       </button>
-
                       <button
                         className="actionBtn delete"
                         onClick={() => openDelete(x)}
@@ -352,7 +301,6 @@ const onCopy = async () => {
                   </td>
                 </tr>
               ))}
-
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={5} className="empty">
@@ -364,7 +312,6 @@ const onCopy = async () => {
           </table>
         </div>
       </div>
-
       {showAdd && (
         <Modal title="New instance" onClose={closeAdd}>
           <div className="formRow">
@@ -375,7 +322,6 @@ const onCopy = async () => {
               placeholder="ex: solr-prod-1"
             />
           </div>
-
           <div className="formRow">
             <label>Host</label>
             <input
@@ -384,7 +330,6 @@ const onCopy = async () => {
               placeholder="ex: 127.0.0.1"
             />
           </div>
-
           <div className="formRow">
             <label>Port</label>
             <input
@@ -394,7 +339,6 @@ const onCopy = async () => {
               placeholder="ex: 8983"
             />
           </div>
-
           <div className="formRow">
             <label>Instance path</label>
             <input
@@ -403,7 +347,6 @@ const onCopy = async () => {
               placeholder="ex: C:/solr/instance1"
             />
           </div>
-
           <div className="formRow">
             <label>Core path</label>
             <input
@@ -412,7 +355,6 @@ const onCopy = async () => {
               placeholder="ex: C:/solr/instance1/core"
             />
           </div>
-
           <div className="formRow">
             <label>Image path</label>
             <input
@@ -421,7 +363,6 @@ const onCopy = async () => {
               placeholder="ex: C:/solr/images/instance1"
             />
           </div>
-
           <div className="modalActions">
             <button
               className="btnPrimary"
@@ -438,20 +379,17 @@ const onCopy = async () => {
             >
               {actionLoading ? "Creating..." : "Create"}
             </button>
-
             <button className="btnGhost" onClick={closeAdd} disabled={actionLoading}>
               Cancel
             </button>
           </div>
         </Modal>
       )}
-
       {showCopy && selected && (
         <Modal title="Copy instance" onClose={closeCopy}>
           <div className="hint">
             Source: <b>{selected.name}</b> ({selected.host}:{selected.port})
           </div>
-
           <div className="formRow">
             <label>New name</label>
             <input
@@ -459,7 +397,6 @@ const onCopy = async () => {
               onChange={(e) => setCopyForm({ ...copyForm, newName: e.target.value })}
             />
           </div>
-
           <div className="formRow">
             <label>New port</label>
             <input
@@ -468,7 +405,6 @@ const onCopy = async () => {
               onChange={(e) => setCopyForm({ ...copyForm, newPort: e.target.value })}
             />
           </div>
-
           <div className="modalActions">
             <button
               className="btnPrimary"
@@ -477,25 +413,21 @@ const onCopy = async () => {
             >
               {actionLoading ? "Copying..." : "Copy"}
             </button>
-
             <button className="btnGhost" onClick={closeCopy} disabled={actionLoading}>
               Cancel
             </button>
           </div>
         </Modal>
       )}
-
       {showDelete && selected && (
         <Modal title="Delete instance" onClose={closeDelete}>
           <div className="dangerBox">
             This will permanently delete <b>{selected.name}</b>.
           </div>
-
           <div className="modalActions">
             <button className="btnDangerSolid" onClick={onDelete} disabled={actionLoading}>
               {actionLoading ? "Deleting..." : "Delete"}
             </button>
-
             <button className="btnGhost" onClick={closeDelete} disabled={actionLoading}>
               Cancel
             </button>
@@ -505,7 +437,6 @@ const onCopy = async () => {
     </div>
   );
 }
-
 function Modal({ title, children, onClose }) {
   return (
     <div className="modalOverlay" onMouseDown={onClose}>

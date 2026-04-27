@@ -203,7 +203,7 @@ export default function SolrSchema() {
 
             {activeTab === "fields" && (
               <div style={styles.rowsWrap}>
-                <span style={styles.rowsLabel}>Rows</span>
+                <span style={styles.rowsLabel}>Lignes</span>
                 <select
                   style={styles.select}
                   value={rowsPerPage}
@@ -262,28 +262,28 @@ export default function SolrSchema() {
                       disabled={safePage === 1}
                       onClick={() => setPage(1)}
                     >
-                      « First
+                      « Premier
                     </button>
                     <button
                       style={{ ...styles.pagerBtn, ...(safePage === 1 ? styles.pagerBtnDisabled : null) }}
                       disabled={safePage === 1}
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                     >
-                      ‹ Prev
+                      ‹ Précedent
                     </button>
                     <button
                       style={{ ...styles.pagerBtn, ...(safePage === totalPages ? styles.pagerBtnDisabled : null) }}
                       disabled={safePage === totalPages}
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     >
-                      Next ›
+                      Suivant ›
                     </button>
                     <button
                       style={{ ...styles.pagerBtn, ...(safePage === totalPages ? styles.pagerBtnDisabled : null) }}
                       disabled={safePage === totalPages}
                       onClick={() => setPage(totalPages)}
                     >
-                      Last »
+                      Dérnier »
                     </button>
                   </div>
                 </div>

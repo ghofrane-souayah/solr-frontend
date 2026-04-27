@@ -3,6 +3,8 @@ import { api } from "../services/api";
 export const SolrInstanceApi = {
   list: () => api("/api/solr/instances"),
 
+  monitoring: () => api("/api/solr/monitoring"),
+
   create: (payload) =>
     api("/api/solr/instances", {
       method: "POST",

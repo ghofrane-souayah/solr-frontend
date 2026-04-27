@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import "./Layout.css";
 
 function getRoles() {
@@ -27,9 +27,11 @@ export default function Layout() {
 
   const roles = useMemo(() => getRoles(), []);
   const user = useMemo(() => getUser(), []);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const isSuperAdmin = roles.includes("SUPER_ADMIN");
   const isAdmin = roles.includes("ADMIN") || isSuperAdmin;
+  const isUser = roles.includes("USER") && !isAdmin;
 
   const email =
     user?.email ||
@@ -44,11 +46,20 @@ export default function Layout() {
   const roleLabel = roles[0] || "ADMIN";
   const initial = (email?.[0] || username?.[0] || "U").toUpperCase();
 
+  const openLogoutConfirm = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const closeLogoutConfirm = () => {
+    setShowLogoutConfirm(false);
+  };
+
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("roles");
     localStorage.removeItem("username");
     localStorage.removeItem("user");
+    setShowLogoutConfirm(false);
     navigate("/login", { replace: true });
   };
 
@@ -57,24 +68,22 @@ export default function Layout() {
 
   const title = useMemo(() => {
     const p = location.pathname;
-    if (p.startsWith("/dashboard")) return "Account Management";
-    if (p.startsWith("/users")) return "Users";
-    if (p.startsWith("/companies")) return "Companies";
+    if (p.startsWith("/dashboard")) return "Dashboard";
+    if (p.startsWith("/users")) return "Gestion Des Utilisateurs";
+    if (p.startsWith("/companies")) return "Gestion Des Compagnies";
+    if (p.startsWith("/reports")) return "Gestion Des Rapports";
     if (p.startsWith("/solr-cluster")) return "Solr Cluster";
-    if (p.startsWith("/solr/server")) return "Nodes";
-    if (p.startsWith("/solr-schema")) return "Solr Schema";
-    if (p.startsWith("/profile")) return "Account";
+    if (p.startsWith("/solr/server")) return "Détails du serveur";
+    if (p.startsWith("/solr-schema")) return "Schema";
+    if (p.startsWith("/profile")) return "Profil";
+    if (p.startsWith("/alerts")) return "Alertes & Notifications";
     return "Solr Admin";
   }, [location.pathname]);
 
   return (
     <div className="appShell">
       <aside className="sidebar">
-        <div
-          className="sidebarTop"
-          onClick={() => navigate("/dashboard")}
-          style={{ cursor: "pointer" }}
-        >
+        <div className="sidebarTop">
           <div className="brand">
             <div className="brandIcon">
               <DatabaseIcon />
@@ -91,21 +100,57 @@ export default function Layout() {
           <div className="menuSection">
             <div className="menuLabel">ADMINISTRATION</div>
 
-            {isAdmin && (
+            {(isAdmin || isUser) && (
               <NavLink to="/solr-cluster" className={navClass}>
                 <span className="menuIcon">
                   <ClusterIcon />
                 </span>
-                <span>Cluster</span>
+                <span>CLUSTERS</span>
+              </NavLink>
+            )}
+
+            {isSuperAdmin && (
+              <NavLink to="/companies" className={navClass}>
+                <span className="menuIcon">
+                  <BuildingIcon />
+                </span>
+                <span>GESTION DES COMPAGNIES</span>
+                <span className="menuArrow">
+                  <ChevronRightIcon />
+                </span>
               </NavLink>
             )}
 
             {isAdmin && (
-              <NavLink to="/dashboard" className={navClass}>
+              <NavLink to="/users" className={navClass}>
                 <span className="menuIcon">
-                  <GridIcon />
+                  <UsersIcon />
                 </span>
-                <span>Account Management</span>
+                <span>GESTION DES UTILISATEURS</span>
+                <span className="menuArrow">
+                  <ChevronRightIcon />
+                </span>
+              </NavLink>
+            )}
+
+            {(isAdmin || isUser) && (
+              <NavLink to="/reports" className={navClass}>
+                <span className="menuIcon">
+                  <ReportIcon />
+                </span>
+                <span>GESTION DES RAPPORTS</span>
+                <span className="menuArrow">
+                  <ChevronRightIcon />
+                </span>
+              </NavLink>
+            )}
+
+            {(isAdmin || isUser) && (
+              <NavLink to="/alerts" className={navClass}>
+                <span className="menuIcon">
+                  <BellIcon />
+                </span>
+                <span>ALERTES</span>
                 <span className="menuArrow">
                   <ChevronRightIcon />
                 </span>
@@ -114,13 +159,35 @@ export default function Layout() {
           </div>
 
           <div className="menuSection">
-            <div className="menuLabel">PERSONNEL</div>
+            <div className="menuLabel">PROFIL</div>
 
-            <NavLink to="/profile" className={navClass}>
+            <NavLink
+              to="/profile#personal"
+              className={() =>
+                location.pathname === "/profile" &&
+                (location.hash === "" || location.hash === "#personal")
+                  ? "menuItem active"
+                  : "menuItem"
+              }
+            >
               <span className="menuIcon">
                 <UserIcon />
               </span>
-              <span>Account</span>
+              <span>INFORMATIONS PERSONNELLES</span>
+            </NavLink>
+
+            <NavLink
+              to="/profile#security"
+              className={() =>
+                location.pathname === "/profile" && location.hash === "#security"
+                  ? "menuItem active"
+                  : "menuItem"
+              }
+            >
+              <span className="menuIcon">
+                <ShieldIcon />
+              </span>
+              <span>SÉCURITÉ</span>
             </NavLink>
           </div>
         </div>
@@ -135,11 +202,11 @@ export default function Layout() {
             </div>
           </div>
 
-          <button className="logoutBtn" onClick={logout} type="button">
+          <button className="logoutBtn" onClick={openLogoutConfirm} type="button">
             <span className="logoutIcon">
               <LogoutIcon />
             </span>
-            <span>Logout</span>
+            <span>Déconnecter</span>
           </button>
         </div>
       </aside>
@@ -167,6 +234,38 @@ export default function Layout() {
           <Outlet />
         </section>
       </main>
+
+      {showLogoutConfirm && (
+        <div className="logoutModalOverlay" onClick={closeLogoutConfirm}>
+          <div
+            className="logoutModal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="logoutModalTitle">Confirmation</div>
+            <div className="logoutModalText">
+              Voulez-vous vraiment vous déconnecter ?
+            </div>
+
+            <div className="logoutModalActions">
+              <button
+                type="button"
+                className="modalBtn ghost"
+                onClick={closeLogoutConfirm}
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                className="modalBtn danger"
+                onClick={logout}
+              >
+                Déconnecter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -192,23 +291,36 @@ function ClusterIcon() {
   );
 }
 
-function ServerIcon() {
+function BuildingIcon() {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="4" y="4" width="16" height="6" rx="1.5" />
-      <rect x="4" y="14" width="16" height="6" rx="1.5" />
-      <path d="M8 7h.01M8 17h.01" />
+      <path d="M4 20V6a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v14" />
+      <path d="M16 20v-8a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v8" />
+      <path d="M8 9h.01M12 9h.01M8 13h.01M12 13h.01" />
+      <path d="M10 20v-3h2v3" />
     </svg>
   );
 }
 
-function GridIcon() {
+function UsersIcon() {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="4" y="4" width="6" height="6" rx="1" />
-      <rect x="14" y="4" width="6" height="6" rx="1" />
-      <rect x="4" y="14" width="6" height="6" rx="1" />
-      <rect x="14" y="14" width="6" height="6" rx="1" />
+      <circle cx="9" cy="8" r="3" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M4 19c1.4-2.8 3.5-4.2 6-4.2s4.6 1.4 6 4.2" />
+      <path d="M15 18c.8-1.7 2.2-2.8 4-3.2" />
+    </svg>
+  );
+}
+
+function ReportIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+      <path d="M14 3v5h5" />
+      <path d="M9 13h6" />
+      <path d="M9 17h6" />
+      <path d="M9 9h2" />
     </svg>
   );
 }
@@ -236,6 +348,16 @@ function LogoutIcon() {
       <path d="M15 16l4-4-4-4" />
       <path d="M19 12H9" />
       <path d="M12 19H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M6 17h12" />
+      <path d="M8 17V10a4 4 0 1 1 8 0v7" />
+      <path d="M10 20a2 2 0 0 0 4 0" />
     </svg>
   );
 }

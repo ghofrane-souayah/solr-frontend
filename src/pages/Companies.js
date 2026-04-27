@@ -1,167 +1,229 @@
-import { useEffect, useMemo, useState } from "react";
-import "./Users.css"; // tu peux réutiliser le style
-
-const API = "http://localhost:8081/api/companies";
-
-function getRoles() {
-  try {
-    const raw = localStorage.getItem("roles");
-    const arr = raw ? JSON.parse(raw) : [];
-    return (Array.isArray(arr) ? arr : [])
-      .map((r) => String(r || "").replace("ROLE_", "").toUpperCase())
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-}
+import { useEffect, useState } from "react";
+import "./companies.css";
+import { api } from "../services/api";
 
 export default function Companies() {
-  const roles = useMemo(() => getRoles(), []);
-  const isSuperAdmin = roles.includes("SUPER_ADMIN");
-
-  const [items, setItems] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState(null);
 
-  const headers = useMemo(() => {
-    const token = localStorage.getItem("token");
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  }, []);
+  const resetMessages = () => {
+    setErrorMsg("");
+    setSuccessMsg("");
+  };
 
-  const load = async () => {
+  const loadCompanies = async () => {
     setLoading(true);
-    setErr("");
+    resetMessages();
+
     try {
-      const res = await fetch(API, { headers });
-      if (res.status === 401 || res.status === 403) throw new Error("FORBIDDEN");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setItems(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setItems([]);
-      setErr(e.message === "FORBIDDEN" ? "Accès réservé au SUPER_ADMIN." : "Erreur chargement companies.");
+      const data = await api("/api/companies");
+      const items = Array.isArray(data) ? data : data?.items ?? data?.data ?? [];
+      setCompanies(items);
+    } catch (error) {
+      console.error(error);
+      setErrorMsg("Erreur lors du chargement des compagnies.");
+      setCompanies([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!isSuperAdmin) {
-      setErr("Accès réservé au SUPER_ADMIN.");
-      return;
-    }
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadCompanies();
   }, []);
 
-  const create = async () => {
-    if (!isSuperAdmin) return;
-    const n = name.trim();
-    if (!n) return;
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    resetMessages();
 
-    setLoading(true);
-    setErr("");
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setErrorMsg("Le nom de la compagnie est obligatoire.");
+      return;
+    }
+
+    setCreating(true);
+
     try {
-      const res = await fetch(API, {
+      await api("/api/companies", {
         method: "POST",
-        headers,
-        body: JSON.stringify({ name: n }),
+        body: { name: trimmedName },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      setSuccessMsg("Compagnie créée avec succès.");
       setName("");
-      await load();
-    } catch (e) {
-      setErr("Erreur création (nom existe déjà ?).");
+      await loadCompanies();
+    } catch (error) {
+      console.error(error);
+      setErrorMsg("Erreur lors de la création de la compagnie.");
     } finally {
-      setLoading(false);
+      setCreating(false);
     }
   };
 
-  const remove = async (id) => {
-    if (!isSuperAdmin) return;
-    if (!window.confirm("Supprimer cette company ?")) return;
+  const openDeleteConfirm = (company) => {
+    setSelectedCompany(company);
+  };
 
-    setLoading(true);
-    setErr("");
+  const closeDeleteConfirm = () => {
+    setSelectedCompany(null);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedCompany) return;
+
+    resetMessages();
+
     try {
-      const res = await fetch(`${API}/${id}`, { method: "DELETE", headers });
-      if (res.status === 409) throw new Error("HAS_USERS");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      await load();
-    } catch (e) {
-      setErr(e.message === "HAS_USERS" ? "Impossible: company contient des users." : "Erreur suppression.");
-    } finally {
-      setLoading(false);
+      await api(`/api/companies/${selectedCompany.id}`, {
+        method: "DELETE",
+      });
+
+      setSuccessMsg("Compagnie supprimée avec succès.");
+      setSelectedCompany(null);
+      await loadCompanies();
+    } catch (error) {
+      console.error(error);
+      setErrorMsg("Erreur lors de la suppression de la compagnie.");
     }
   };
 
   return (
-    <div className="usersPage">
-      <div className="usersHeader">
+    <div className="companiesPage">
+      <div className="companiesTop">
         <div>
-          <div className="usersTitle">Companies</div>
-          <div className="usersSub">SUPER_ADMIN uniquement</div>
+   
+          <p className="companiesSub">
+            Ajoute, consulte et supprime les compagnies de la plateforme.
+          </p>
         </div>
 
-        <div className="usersActions">
-          <button className="btn" onClick={load} disabled={loading || !isSuperAdmin}>Refresh</button>
+        <div className="companiesTopActions">
+          <button
+            className="btn ghost sm"
+            type="button"
+            onClick={loadCompanies}
+            disabled={loading}
+          >
+            {loading ? "Chargement..." : "Actualiser"}
+          </button>
         </div>
       </div>
 
-      {err && <div className="alert danger">{err}</div>}
+      {errorMsg && <div className="companiesMessage error">{errorMsg}</div>}
+      {successMsg && <div className="companiesMessage success">{successMsg}</div>}
 
-      {isSuperAdmin && (
-        <div className="card" style={{ padding: 14, marginBottom: 14 }}>
-          <div style={{ display: "flex", gap: 10 }}>
-            <input
-              className="input"
-              style={{ flex: 1 }}
-              placeholder="Nom company (ex: Company A)"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <button className="btn primary" onClick={create} disabled={loading}>+ Create</button>
+      <div className="companiesPanel">
+        <div className="companiesPanelHead">
+          <div>
+            <div className="companiesPanelTitle">Créer une compagnie</div>
+            <div className="companiesPanelSub">
+              Ajoute une nouvelle compagnie à la plateforme.
+            </div>
+          </div>
+        </div>
+
+        <form className="companiesForm" onSubmit={handleCreate}>
+          <input
+            type="text"
+            placeholder="Nom de la compagnie (ex: Company A)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+
+          <button className="btn primary sm" type="submit" disabled={creating}>
+            {creating ? "Création..." : "+ Créer"}
+          </button>
+        </form>
+      </div>
+
+      <div className="companiesPanel">
+        <div className="companiesPanelHead">
+          <div>
+            <div className="companiesPanelTitle">Liste des compagnies</div>
+            <div className="companiesPanelSub">
+              Consulte et supprime les compagnies existantes.
+            </div>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="companiesEmpty">Chargement des compagnies...</div>
+        ) : companies.length === 0 ? (
+          <div className="companiesEmpty">Aucune compagnie trouvée.</div>
+        ) : (
+          <div className="companiesTableWrap">
+            <table className="companiesTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>NOM</th>
+                  <th>CODE</th>
+                  <th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companies.map((company) => (
+                  <tr key={company.id}>
+                    <td>{company.id}</td>
+                    <td>{company.name}</td>
+                    <td>{company.code ?? "-"}</td>
+                    <td>
+                      <div className="tableActions">
+                        <button
+                          className="btn danger sm"
+                          type="button"
+                          onClick={() => openDeleteConfirm(company)}
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {selectedCompany && (
+        <div className="logoutModalOverlay" onClick={closeDeleteConfirm}>
+          <div
+            className="logoutModal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="logoutModalTitle">Confirmation</div>
+            <div className="logoutModalText">
+              Voulez-vous vraiment supprimer la compagnie{" "}
+              <strong>{selectedCompany.name}</strong> ?
+            </div>
+
+            <div className="logoutModalActions">
+              <button
+                type="button"
+                className="modalBtn ghost"
+                onClick={closeDeleteConfirm}
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                className="modalBtn danger"
+                onClick={handleDelete}
+              >
+                Supprimer
+              </button>
+            </div>
           </div>
         </div>
       )}
-
-      <div className="card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>NAME</th>
-              <th>CODE</th>
-              <th className="right">ACTIONS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((c) => (
-              <tr key={c.id}>
-                <td>{c.id}</td>
-                <td>{c.name}</td>
-                <td><b>{c.code}</b></td>
-                <td className="right">
-                  <button className="btn sm danger" onClick={() => remove(c.id)} disabled={loading}>
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {items.length === 0 && (
-              <tr>
-                <td colSpan={4} className="emptyRow">Aucune company.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {loading && <div className="alert">Chargement…</div>}
     </div>
   );
 }

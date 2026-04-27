@@ -31,7 +31,7 @@ function pctTone(v) {
 }
 
 export default function SolrServerDetails() {
-  const { id } = useParams(); // ✅ /solr/server/:id
+  const { id } = useParams();
   const nav = useNavigate();
 
   const [details, setDetails] = useState(null);
@@ -40,6 +40,20 @@ export default function SolrServerDetails() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
+
+  const roles = (() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("roles") || "[]");
+      return (Array.isArray(raw) ? raw : []).map((r) =>
+        String(r || "").replace("ROLE_", "").toUpperCase()
+      );
+    } catch {
+      return [];
+    }
+  })();
+
+  const canManageCollections =
+    roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
 
   const load = useCallback(
     async (signal) => {
@@ -61,7 +75,6 @@ export default function SolrServerDetails() {
 
         const headers = getAuthHeaders();
 
-        // ✅ DETAILS BY ID
         const resDetails = await fetch(`${API}/${encodeURIComponent(id)}`, {
           method: "GET",
           headers,
@@ -74,22 +87,22 @@ export default function SolrServerDetails() {
 
         const d = await resDetails.json();
 
-        // ✅ HEALTH (optionnel)
         let hl = null;
         try {
-          const resHealth = await fetch(`${API}/${encodeURIComponent(id)}/health`, {
-            method: "GET",
-            headers,
-            signal,
-          });
+          const resHealth = await fetch(
+            `${API}/${encodeURIComponent(id)}/health`,
+            {
+              method: "GET",
+              headers,
+              signal,
+            }
+          );
           if (resHealth.status === 401) throw new Error("UNAUTHORIZED");
           if (resHealth.status === 403) throw new Error("FORBIDDEN");
           if (resHealth.ok) hl = await resHealth.json();
         } catch {
-          // ignore (health optionnel)
         }
 
-        // ✅ CORES
         const coresArr = Array.isArray(d?.cores) ? d.cores : [];
 
         setDetails(d);
@@ -131,7 +144,6 @@ export default function SolrServerDetails() {
     return `http://${host}:${port}`;
   }, [details]);
 
-  // ✅ statut
   const computedStatus = useMemo(() => {
     const s1 = String(details?.status ?? "").toUpperCase();
     const s2 = String(health?.status ?? "").toUpperCase();
@@ -148,7 +160,9 @@ export default function SolrServerDetails() {
   const filteredCores = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return cores;
-    return cores.filter((c) => String(c?.name ?? "").toLowerCase().includes(s));
+    return cores.filter((c) =>
+      String(c?.name ?? "").toLowerCase().includes(s)
+    );
   }, [cores, q]);
 
   const copy = async (text) => {
@@ -157,19 +171,19 @@ export default function SolrServerDetails() {
     } catch {}
   };
 
-  // ✅ CLICK CORE -> ouvre schema
   const goToSchema = (coreName) => {
     const cn = String(coreName || "").trim();
     if (!cn || cn === "—") return;
 
     nav(
-      `/solr-schema?serverId=${encodeURIComponent(id)}&core=${encodeURIComponent(cn)}`
+      `/solr-schema?serverId=${encodeURIComponent(id)}&core=${encodeURIComponent(
+        cn
+      )}`
     );
   };
 
   return (
     <div className="srvPage">
-      {/* TOP HEADER */}
       <div className="srvHeader">
         <div className="srvHeaderLeft">
           <div className="crumbs">
@@ -204,9 +218,21 @@ export default function SolrServerDetails() {
               onClick={() => copy(baseUrl)}
               title="Copier l’URL"
             >
-              Copy URL
+              Copier URL
             </button>
           )}
+
+          {canManageCollections && (
+            <button
+              className="btn ghost"
+              onClick={() =>
+                nav(`/solr/server/${encodeURIComponent(id)}/collections`)
+              }
+            >
+              Collections
+            </button>
+          )}
+
           <button
             className="btn"
             onClick={() => {
@@ -215,14 +241,13 @@ export default function SolrServerDetails() {
             }}
             disabled={loading}
           >
-            {loading ? "Loading…" : "Refresh"}
+            {loading ? "Loading…" : "  ⟳ Actualiser"}
           </button>
         </div>
       </div>
 
       {err && <div className="notice error">❌ {err}</div>}
 
-      {/* KPI */}
       <div className="kpiGrid">
         <div className="kpiCard">
           <div className="kpiTop">
@@ -269,7 +294,6 @@ export default function SolrServerDetails() {
         </div>
       </div>
 
-      {/* INFO + HEALTH */}
       <div className="grid2">
         <div className="panel">
           <div className="panelHead">
@@ -311,7 +335,9 @@ export default function SolrServerDetails() {
             <div className="healthItem">
               <div className="k">Response time</div>
               <div className="v">
-                {health?.responseTimeMs != null ? `${health.responseTimeMs} ms` : "—"}
+                {health?.responseTimeMs != null
+                  ? `${health.responseTimeMs} ms`
+                  : "—"}
               </div>
             </div>
             <div className="healthItem">
@@ -332,19 +358,18 @@ export default function SolrServerDetails() {
         </div>
       </div>
 
-      {/* CORES TABLE */}
       <div className="panel">
         <div className="panelHead row">
           <div>
-            <div className="panelTitle">Cores</div>
-            <div className="panelSub">Liste et statistiques des cores</div>
+            <div className="panelTitle">Collections</div>
+            <div className="panelSub">Liste et statistiques des collections</div>
           </div>
 
           <div className="rightTools">
             <div className="searchBox">
               <span>⌕</span>
               <input
-                placeholder="Search core…"
+                placeholder="rechrche collection…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
@@ -359,10 +384,10 @@ export default function SolrServerDetails() {
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th>
+                <th>Nom</th>
                 <th className="right">Docs</th>
-                <th className="right">Deleted</th>
-                <th className="right">Size</th>
+                <th className="right">Supprimer</th>
+                <th className="right">Taille</th>
               </tr>
             </thead>
             <tbody>
@@ -376,7 +401,9 @@ export default function SolrServerDetails() {
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") goToSchema(coreName);
+                      if (e.key === "Enter" || e.key === " ") {
+                        goToSchema(coreName);
+                      }
                     }}
                     title="Ouvrir Solr Schema"
                   >

@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { SolrInstanceApi } from "../api/solrInstanceApi";
 import "./SolrCluster.css";
-
-const API = "http://localhost:8081/api/solr/monitoring";
 
 function getRoles() {
   try {
@@ -20,7 +18,6 @@ function getRoles() {
 function getSavedCompanyId() {
   try {
     const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
-
     return (
       localStorage.getItem("companyId") ||
       savedUser?.companyId ||
@@ -37,15 +34,19 @@ export default function SolrCluster() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("ALL");
   const [q, setQ] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [openCores, setOpenCores] = useState({});
   const [showAdd, setShowAdd] = useState(false);
   const [showCopy, setShowCopy] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [selected, setSelected] = useState(null);
 
-  const startedRef = useRef(false);
+  const [creating, setCreating] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [startingId, setStartingId] = useState(null);
+
   const toastTimerRef = useRef(null);
 
   const [addForm, setAddForm] = useState({
@@ -69,15 +70,9 @@ export default function SolrCluster() {
   const isSuperAdmin = roles.includes("SUPER_ADMIN");
   const isAdmin = roles.includes("ADMIN") || isSuperAdmin;
   const isUser = roles.includes("USER");
+  const savedCompanyId = String(getSavedCompanyId());
   const canView = isSuperAdmin || isAdmin || isUser;
   const canManage = isAdmin;
-
-  const toggleCores = (serverName) => {
-    setOpenCores((prev) => ({
-      ...prev,
-      [serverName]: !prev[serverName],
-    }));
-  };
 
   const notify = (type, text) => {
     setToast({ type, text });
@@ -91,69 +86,41 @@ export default function SolrCluster() {
     }, 2600);
   };
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    setInitialLoading((prev) => (data ? prev : true));
+    setRefreshing(true);
     setError("");
-    setLoading(true);
-
-    const token = localStorage.getItem("token");
 
     try {
-      const res = await fetch(API, {
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-
-      if (res.status === 401 || res.status === 403) {
-        throw new Error("UNAUTHORIZED");
-      }
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-
-      const json = await res.json();
+      const json = await SolrInstanceApi.monitoring();
       setData(json);
+      setError("");
     } catch (e) {
-      console.error(e);
-      setError(
-        e?.message === "UNAUTHORIZED"
-          ? "Accès refusé / session expirée. Reconnecte-toi."
-          : `Erreur chargement: ${e?.message || "unknown"}`
-      );
-      setData(null);
+      setError(`Erreur chargement: ${e?.message || "unknown"}`);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [data]);
 
   useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-
     load();
 
-    const id = setInterval(load, 5000);
-
     return () => {
-      clearInterval(id);
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
     };
-  }, []);
+  }, [load]);
 
   const servers = useMemo(() => {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data.nodes)) return data.nodes;
-    if (Array.isArray(data.servers)) return data.servers;
-    return [];
+    return data?.nodes ?? data?.servers ?? (Array.isArray(data) ? data : []);
   }, [data]);
 
   const stats = useMemo(() => {
     const total = servers.length;
     const up = servers.filter((s) => s.status === "UP").length;
-    const down = total - up;
+    const down = servers.filter((s) => s.status === "DOWN").length;
     return { total, up, down };
   }, [servers]);
 
@@ -166,7 +133,7 @@ export default function SolrCluster() {
 
       if (!query) return true;
 
-      const hay = `${s.name} ${s.host} ${s.port}`.toLowerCase();
+      const hay = `${s.name || ""} ${s.host || ""} ${s.port || ""}`.toLowerCase();
       return hay.includes(query);
     });
   }, [servers, filter, q]);
@@ -185,21 +152,20 @@ export default function SolrCluster() {
     if (lower.includes("companyid is required")) {
       return "Company ID est obligatoire.";
     }
-
     if (lower.includes("port already used")) {
       return "Le port est déjà utilisé. Choisissez un autre port.";
     }
-
     if (lower.includes("host + port already exists")) {
       return "Cette combinaison host + port existe déjà.";
     }
-
     if (lower.includes("instance name already exists")) {
       return "Le nom de l’instance existe déjà.";
     }
-
     if (lower.includes("access denied") || lower.includes("forbidden")) {
       return "Accès refusé.";
+    }
+    if (lower.includes("not ready yet")) {
+      return "Le conteneur Solr est lancé mais pas encore prêt.";
     }
 
     return msg;
@@ -215,11 +181,12 @@ export default function SolrCluster() {
       name: "",
       host: server?.host || "127.0.0.1",
       port: "",
-      companyId: String(getSavedCompanyId()),
+      companyId: isSuperAdmin ? "" : savedCompanyId,
       instancePath: "AUTO",
       corePath: "AUTO",
       imagePath: "solr:9.10.1",
     });
+
     setShowAdd(true);
   };
 
@@ -248,6 +215,8 @@ export default function SolrCluster() {
   };
 
   const closeAdd = () => {
+    if (creating) return;
+
     setShowAdd(false);
     setAddForm({
       name: "",
@@ -261,6 +230,8 @@ export default function SolrCluster() {
   };
 
   const closeCopy = () => {
+    if (copying) return;
+
     setShowCopy(false);
     setSelected(null);
     setCopyForm({
@@ -270,6 +241,8 @@ export default function SolrCluster() {
   };
 
   const closeDelete = () => {
+    if (deleting) return;
+
     setShowDelete(false);
     setSelected(null);
   };
@@ -280,7 +253,20 @@ export default function SolrCluster() {
       return;
     }
 
+    const name = addForm.name.trim();
+    const host = addForm.host.trim();
+    const port = Number(addForm.port);
     const finalCompanyId = Number(addForm.companyId);
+
+    if (!name || !host || !addForm.port) {
+      notify("error", "Tous les champs obligatoires doivent être remplis.");
+      return;
+    }
+
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      notify("error", "Le port doit être compris entre 1 et 65535.");
+      return;
+    }
 
     if (!finalCompanyId) {
       notify("error", "Company ID est obligatoire.");
@@ -288,41 +274,57 @@ export default function SolrCluster() {
     }
 
     try {
+      setCreating(true);
+
       await SolrInstanceApi.create({
-        name: addForm.name.trim(),
-        host: addForm.host.trim(),
-        port: Number(addForm.port),
+        name,
+        host,
+        port,
         instancePath: addForm.instancePath.trim(),
         corePath: addForm.corePath.trim(),
         imagePath: addForm.imagePath.trim(),
         companyId: finalCompanyId,
       });
 
+      notify("success", "Instance créée avec succès.");
       closeAdd();
-      notify("success", "Instance créée.");
       await load();
     } catch (e) {
-      const apiError =
-        e?.response?.data?.errors?.[0]?.field &&
-        e?.response?.data?.errors?.[0]?.defaultMessage
-          ? `${e.response.data.errors[0].field}: ${e.response.data.errors[0].defaultMessage}`
-          : e?.response?.data?.message || e?.message || "Erreur création";
-
-      notify("error", mapInstanceError(apiError, "Erreur création"));
+      notify(
+        "error",
+        mapInstanceError(e?.response?.data?.message || e?.message)
+      );
+    } finally {
+      setCreating(false);
     }
   };
 
   const onCopy = async () => {
     if (!selected || !canManage) return;
 
+    const newName = copyForm.newName.trim();
+    const newPort = Number(copyForm.newPort);
+
+    if (!newName || !copyForm.newPort) {
+      notify("error", "Le nom et le port sont obligatoires.");
+      return;
+    }
+
+    if (!Number.isInteger(newPort) || newPort < 1 || newPort > 65535) {
+      notify("error", "Le port doit être compris entre 1 et 65535.");
+      return;
+    }
+
     try {
+      setCopying(true);
+
       await SolrInstanceApi.copy(selected.id, {
-        newName: copyForm.newName.trim(),
-        newPort: Number(copyForm.newPort),
+        newName,
+        newPort,
       });
 
       closeCopy();
-      notify("success", "Instance copiée avec succès.");
+      notify("success", "Instance copiée.");
       await load();
     } catch (e) {
       notify(
@@ -332,6 +334,8 @@ export default function SolrCluster() {
           "Erreur lors de la copie"
         )
       );
+    } finally {
+      setCopying(false);
     }
   };
 
@@ -339,6 +343,7 @@ export default function SolrCluster() {
     if (!selected || !canManage) return;
 
     try {
+      setDeleting(true);
       await SolrInstanceApi.remove(selected.id);
       closeDelete();
       notify("success", "Instance supprimée.");
@@ -351,6 +356,32 @@ export default function SolrCluster() {
           "Erreur suppression"
         )
       );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const onStart = async (server) => {
+    if (!canManage) {
+      notify("error", "Accès refusé.");
+      return;
+    }
+
+    try {
+      setStartingId(server.id);
+      await SolrInstanceApi.start(server.id);
+      notify("success", `Instance "${server.name}" démarrée.`);
+      await load();
+    } catch (e) {
+      notify(
+        "error",
+        mapInstanceError(
+          e?.response?.data?.message || e?.message,
+          "Erreur démarrage"
+        )
+      );
+    } finally {
+      setStartingId(null);
     }
   };
 
@@ -362,23 +393,6 @@ export default function SolrCluster() {
     <div className="solrPage">
       <ToastPortal toast={toast} onClose={() => setToast(null)} />
 
-      <div className="solrHeader">
-        <div>
-          <h1 className="solrTitle">Solr Cluster</h1>
-          <div className="solrSubtitle">Monitoring & Management Console</div>
-        </div>
-
-        <div className="solrHeaderRight">
-          <div className="metaPill" title={API}>
-            Monitoring API
-          </div>
-
-          <button className="btn primary" onClick={load} disabled={loading}>
-            {loading ? "Loading..." : "Refresh"}
-          </button>
-        </div>
-      </div>
-
       <div className="panel">
         <div className="panelTop">
           <div>
@@ -388,7 +402,7 @@ export default function SolrCluster() {
 
           {data?.generatedAt && (
             <div className="metaPill">
-              Last sync: <span className="mono">{data.generatedAt}</span>
+              Last sync: <span className="mono">{formatDateTime(data.generatedAt)}</span>
             </div>
           )}
         </div>
@@ -397,19 +411,19 @@ export default function SolrCluster() {
 
         <div className="kpiGrid">
           <div className="kpiCard">
-            <div className="kpiLabel">Total</div>
-            <div className="kpiValue">{stats.total}</div>
+            <div className="kpiLabel">Total ⚪</div>
+            <div className="kpiValue">{servers.length}</div>
             <div className="kpiHint">Nodes discovered</div>
           </div>
 
           <div className="kpiCard">
-            <div className="kpiLabel">Up</div>
+            <div className="kpiLabel">Up 🟢</div>
             <div className="kpiValue">{stats.up}</div>
             <div className="kpiHint">Healthy nodes</div>
           </div>
 
           <div className="kpiCard">
-            <div className="kpiLabel">Down</div>
+            <div className="kpiLabel">Down 🔴</div>
             <div className="kpiValue">{stats.down}</div>
             <div className="kpiHint">Unreachable nodes</div>
           </div>
@@ -420,7 +434,7 @@ export default function SolrCluster() {
         <div className="panelTop panelTopServers">
           <div className="serversTitleWrap">
             <div>
-              <div className="panelTitle">Solr servers</div>
+              <div className="panelTitle">Solr serveurs</div>
               <div className="panelSub">Browse nodes and inspect metrics</div>
             </div>
 
@@ -462,7 +476,7 @@ export default function SolrCluster() {
             <div className="searchBox">
               <span>⌕</span>
               <input
-                placeholder="Search name / host / port..."
+                placeholder="Recherche nom / host / port..."
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
@@ -470,161 +484,115 @@ export default function SolrCluster() {
           </div>
         </div>
 
-        {data && !loading && filteredServers.length === 0 && (
+        {initialLoading && !data ? (
+          <div className="notice">Chargement des serveurs...</div>
+        ) : filteredServers.length === 0 ? (
           <div className="notice">Aucun serveur ne correspond au filtre.</div>
-        )}
+        ) : null}
 
         <div className="serverList">
-          {filteredServers.map((s) => {
-            const cores = Array.isArray(s.cores) ? s.cores : [];
-            const hasCores = cores.length > 0;
-            const isOpen = !!openCores[s.name];
-            const safeId = String(s.name).replace(/[^a-zA-Z0-9_-]/g, "_");
-            const panelId = `cores-panel-${safeId}`;
+          {filteredServers.map((s) => (
+            <div key={`${s.id}-${s.name}-${s.host}-${s.port}`} className="serverCard">
+              <div className="serverTop">
+                <div>
+                  <div className="serverNameRow">
+                    <Link to={`/solr/server/${s.id}`} className="serverLink serverName">
+                      {s.name}
+                    </Link>
 
-            return (
-              <div key={`${s.name}-${s.host}-${s.port}`} className="serverCard">
-                <div className="serverTop">
-                  <div>
-                    <div className="serverNameRow">
-                      <Link
-                        to={`/solr/server/${s.id}`}
-                        className="serverLink serverName"
-                      >
-                        {s.name}
-                      </Link>
-
-                      <span
-                        className={`status ${s.status === "UP" ? "up" : "down"}`}
-                      >
-                        {s.status}
-                      </span>
-                    </div>
-
-                    <div className="serverAddr mono">
-                      {s.host}:{s.port}
-                    </div>
+                    <span
+                      className={`status ${
+                        s.status === "UP" ? "up" : s.status === "DOWN" ? "down" : "warn"
+                      }`}
+                    >
+                      {s.status}
+                    </span>
                   </div>
 
-                  <div className="serverActions directActions">
-                    {canManage && (
-                      <button
-                        type="button"
-                        className="btn secondary small"
-                        onClick={() => openCopy(s)}
-                      >
-                        Copy
-                      </button>
-                    )}
+                  <div className="serverAddr mono">
+                    {s.host}:{s.port}
+                  </div>
 
-                    {canManage && (
-                      <button
-                        type="button"
-                        className="btn danger small"
-                        onClick={() => openDelete(s)}
-                      >
-                        Delete
-                      </button>
-                    )}
+                  <div className="serverMeta">
+                    Last health check:{" "}
+                    <span className="mono">{formatDateTime(s.lastHealthCheckTime)}</span>
                   </div>
                 </div>
 
-                <div className="metricsRow">
-                  <div className={`metric ${pctColor(s.cpu)}`}>
-                    <div className="metricLabel">CPU</div>
-                    <div className="metricValue">{Number(s.cpu) || 0}%</div>
-                  </div>
+                <div className="serverActions directActions">
+                  {canManage && s.status !== "UP" && (
+                    <button
+                      type="button"
+                      className="btn primary small"
+                      onClick={() => onStart(s)}
+                      disabled={startingId === s.id}
+                    >
+                      {startingId === s.id ? "Démarrage..." : "Start"}
+                    </button>
+                  )}
 
-                  <div className={`metric ${pctColor(s.memory)}`}>
-                    <div className="metricLabel">Memory</div>
-                    <div className="metricValue">{Number(s.memory) || 0}%</div>
-                  </div>
+                  {canManage && (
+                    <button
+                      type="button"
+                      className="btn secondary small"
+                      onClick={() => openCopy(s)}
+                    >
+                      Copier
+                    </button>
+                  )}
 
-                  <div className="metric">
-                    <div className="metricLabel">Total docs</div>
-                    <div className="metricValue">{s.totalDocs ?? 0}</div>
-                  </div>
-
-                  <div className="metric">
-                    <div className="metricLabel">Total size</div>
-                    <div className="metricValue">
-                      {formatBytes(s.totalSizeInBytes ?? 0)}
-                    </div>
-                  </div>
-                </div>
-
-                {Array.isArray(s.alerts) && s.alerts.length > 0 && (
-                  <div className="notice warn">⚠️ Alerts: {s.alerts.join(", ")}</div>
-                )}
-
-                {s.error && <div className="notice error">❌ {s.error}</div>}
-
-                <div className="coresBlock">
-                  <button
-                    type="button"
-                    className={`coresHeaderBtn ${isOpen ? "open" : ""}`}
-                    onClick={() => (hasCores ? toggleCores(s.name) : null)}
-                    disabled={!hasCores}
-                    aria-expanded={isOpen}
-                    aria-controls={panelId}
-                    title={!hasCores ? "Aucun core" : "Afficher / masquer"}
-                  >
-                    <div className="coresHeaderLeft">
-                      <span className="coresTitle">Cores</span>
-                      <span className="coresBadge">{cores.length}</span>
-                      {!hasCores ? (
-                        <span className="coresHintInline">Aucun core</span>
-                      ) : null}
-                    </div>
-
-                    <span className={`chev ${isOpen ? "rot" : ""}`}>▾</span>
-                  </button>
-
-                  <div id={panelId} className={`collapse ${isOpen ? "open" : ""}`}>
-                    <div className="collapseInner">
-                      <div className="coresTableWrap">
-                        <table className="coresTable">
-                          <thead>
-                            <tr>
-                              <th>Name</th>
-                              <th>Docs</th>
-                              <th>Deleted</th>
-                              <th>Size</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {cores.map((c) => (
-                              <tr key={c.name}>
-                                <td className="mono">{c.name}</td>
-                                <td>{c.numDocs ?? 0}</td>
-                                <td>{c.deletedDocs ?? 0}</td>
-                                <td>{formatBytes(c.sizeInBytes ?? 0)}</td>
-                              </tr>
-                            ))}
-
-                            {cores.length === 0 && (
-                              <tr>
-                                <td colSpan={4} className="muted" style={{ padding: 12 }}>
-                                  Aucun core.
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
+                  {canManage && (
+                    <button
+                      type="button"
+                      className="btn destructive small"
+                      onClick={() => openDelete(s)}
+                    >
+                      Supprimer
+                    </button>
+                  )}
                 </div>
               </div>
-            );
-          })}
+
+              <div className="metricsRow">
+                <div className={`metric ${pctColor(s.cpu)}`}>
+                  <div className="metricLabel">CPU</div>
+                  <div className="metricValue">{Number(s.cpu) || 0}%</div>
+                </div>
+
+                <div className={`metric ${pctColor(s.memory)}`}>
+                  <div className="metricLabel">Memory</div>
+                  <div className="metricValue">{Number(s.memory) || 0}%</div>
+                </div>
+
+                <div className="metric">
+                  <div className="metricLabel">Total docs</div>
+                  <div className="metricValue">{s.totalDocs ?? 0}</div>
+                </div>
+
+                <div className="metric">
+                  <div className="metricLabel">Total size</div>
+                  <div className="metricValue">{formatBytes(s.totalSizeInBytes ?? 0)}</div>
+                </div>
+              </div>
+
+              {Array.isArray(s.alerts) && s.alerts.length > 0 && (
+                <div className="notice warn">Alerts: {s.alerts.join(", ")}</div>
+              )}
+
+              {s.status === "DOWN" ? (
+                <div className="notice error">Le serveur est DOWN et ne répond pas.</div>
+              ) : s.error ? (
+                <div className="notice error">Erreur: {s.error}</div>
+              ) : null}
+            </div>
+          ))}
         </div>
       </div>
 
       {showAdd && canManage && (
-        <Modal title="Add instance" onClose={closeAdd}>
+        <Modal title="Ajouter instance" onClose={closeAdd} preventClose={creating}>
           <div className="modalField">
-            <label className="label">Name</label>
+            <label className="label">Nom</label>
             <input
               className="input"
               value={addForm.name}
@@ -648,28 +616,30 @@ export default function SolrCluster() {
             <input
               className="input"
               type="number"
+              min="1"
+              max="65535"
               value={addForm.port}
               onChange={(e) => setAddForm({ ...addForm, port: e.target.value })}
               placeholder="ex: 8983"
             />
           </div>
 
-          <div className="modalField">
-            <label className="label">Company ID</label>
-            <input
-              className="input"
-              type="number"
-              value={addForm.companyId}
-              onChange={(e) =>
-                setAddForm({ ...addForm, companyId: e.target.value })
-              }
-              placeholder="ex: 1"
-            />
-          </div>
+          {isSuperAdmin && (
+            <div className="modalField">
+              <label className="label">Company ID</label>
+              <input
+                className="input"
+                type="number"
+                value={addForm.companyId}
+                onChange={(e) => setAddForm({ ...addForm, companyId: e.target.value })}
+                placeholder="Ex: 1"
+              />
+            </div>
+          )}
 
           <div className="modalFoot">
-            <button type="button" className="btn ghost" onClick={closeAdd}>
-              Cancel
+            <button type="button" className="btn ghost" onClick={closeAdd} disabled={creating}>
+              Annuler
             </button>
 
             <button
@@ -677,79 +647,84 @@ export default function SolrCluster() {
               className="btn primary"
               onClick={onAdd}
               disabled={
+                creating ||
                 !addForm.name.trim() ||
                 !addForm.host.trim() ||
                 !addForm.port ||
-                !addForm.companyId
+                (!isSuperAdmin && !savedCompanyId) ||
+                (isSuperAdmin && !addForm.companyId)
               }
             >
-              Create
+              {creating ? "Création..." : "Créer"}
             </button>
           </div>
         </Modal>
       )}
 
       {showCopy && selected && canManage && (
-        <Modal title="Copy instance" onClose={closeCopy}>
+        <Modal title="Copier instance" onClose={closeCopy} preventClose={copying}>
           <div className="hint">
             Source: <b>{selected.name}</b> ({selected.host}:{selected.port})
           </div>
 
           <div className="modalField">
-            <label className="label">New name</label>
+            <label className="label">Nouveau Nom</label>
             <input
               className="input"
               value={copyForm.newName}
-              onChange={(e) =>
-                setCopyForm({ ...copyForm, newName: e.target.value })
-              }
+              onChange={(e) => setCopyForm({ ...copyForm, newName: e.target.value })}
               placeholder="Enter new instance name"
             />
           </div>
 
           <div className="modalField">
-            <label className="label">New port</label>
+            <label className="label">Nouveau Port</label>
             <input
               className="input"
               type="number"
+              min="1"
+              max="65535"
               value={copyForm.newPort}
-              onChange={(e) =>
-                setCopyForm({ ...copyForm, newPort: e.target.value })
-              }
+              onChange={(e) => setCopyForm({ ...copyForm, newPort: e.target.value })}
               placeholder="Enter new port"
             />
           </div>
 
           <div className="modalFoot">
-            <button type="button" className="btn ghost" onClick={closeCopy}>
-              Cancel
+            <button type="button" className="btn ghost" onClick={closeCopy} disabled={copying}>
+              Annuler
             </button>
 
             <button
               type="button"
               className="btn primary"
               onClick={onCopy}
-              disabled={!copyForm.newName.trim() || !copyForm.newPort}
+              disabled={copying || !copyForm.newName.trim() || !copyForm.newPort}
             >
-              Copy
+              {copying ? "Copie..." : "Copier"}
             </button>
           </div>
         </Modal>
       )}
 
       {showDelete && selected && canManage && (
-        <Modal title="Delete instance" onClose={closeDelete}>
+        <Modal title="Delete instance" onClose={closeDelete} preventClose={deleting}>
           <div className="dangerBox">
             This will permanently delete <b>{selected.name}</b>.
           </div>
 
           <div className="modalFoot">
-            <button type="button" className="btn ghost" onClick={closeDelete}>
-              Cancel
+            <button type="button" className="btn ghost" onClick={closeDelete} disabled={deleting}>
+              Annuler
             </button>
 
-            <button type="button" className="btn danger" onClick={onDelete}>
-              Delete
+            <button
+              type="button"
+              className="btn destructive"
+              onClick={onDelete}
+              disabled={deleting}
+            >
+              {deleting ? "Suppression..." : "Supprimer"}
             </button>
           </div>
         </Modal>
@@ -792,10 +767,10 @@ function ToastPortal({ toast, onClose }) {
   );
 }
 
-function Modal({ title, children, onClose }) {
+function Modal({ title, children, onClose, preventClose = false }) {
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !preventClose) onClose();
     };
 
     const previousOverflow = document.body.style.overflow;
@@ -806,20 +781,31 @@ function Modal({ title, children, onClose }) {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, preventClose]);
+
+  const handleOverlayMouseDown = () => {
+    if (!preventClose) onClose();
+  };
 
   return createPortal(
-    <div className="modalOverlay" onMouseDown={onClose}>
-      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+  <div className="modalOverlay" onMouseDown={handleOverlayMouseDown}>
+  <div className="solrPage modalScope">
+    <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modalHead">
           <h3 className="modalTitle">{title}</h3>
 
-          <button type="button" className="modalClose" onClick={onClose}>
+          <button
+            type="button"
+            className="modalClose"
+            onClick={onClose}
+            disabled={preventClose}
+          >
             ✕
           </button>
         </div>
 
         <div className="modalBody">{children}</div>
+      </div>
       </div>
     </div>,
     document.body
@@ -838,4 +824,14 @@ function formatBytes(bytes) {
 
   const gb = mb / 1024;
   return `${gb.toFixed(2)} GB`;
+}
+
+function formatDateTime(value) {
+  if (!value) return "N/A";
+
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return value;
+  }
 }

@@ -45,10 +45,13 @@ export default function Register() {
         </div>
 
         <div className="register-container">
-          <h2>Création du compte</h2>
+          <h2>Créer un compte</h2>
+          <p className="register-subtitle">
+  Rejoignez notre communauté dès aujourd'hui
+</p>
 
           <form className="register-form" onSubmit={onSubmit} autoComplete="off">
-            <label>USERNAME</label>
+            <label>Nom Utilisateur</label>
             <input
               type="text"
               value={username}
@@ -66,7 +69,7 @@ export default function Register() {
               required
             />
 
-            <label>PASSWORD</label>
+            <label>Mot de Passe</label>
             <div className="password-wrapper">
               <input
                 type={showPassword ? "text" : "password"}
@@ -87,7 +90,7 @@ export default function Register() {
               </button>
             </div>
 
-            <label>COMPANY CODE</label>
+            <label>Code Company </label>
             <input
               type="text"
               value={companyCode}

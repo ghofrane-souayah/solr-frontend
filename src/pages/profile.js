@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import "./profile.css";
 
 const API = "http://localhost:8081/api/users";
@@ -23,6 +23,14 @@ function getRoles() {
   }
 }
 
+function getSavedUser() {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "{}");
+  } catch {
+    return {};
+  }
+}
+
 function strengthScore(pwd) {
   const p = String(pwd || "");
   let s = 0;
@@ -35,12 +43,18 @@ function strengthScore(pwd) {
 }
 
 export default function Profile() {
-  const navigate = useNavigate();
+  const location = useLocation();
   const roles = useMemo(() => getRoles(), []);
-  const isAdmin = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
+  const currentUser = useMemo(() => getSavedUser(), []);
+  const currentUserId = currentUser?.id;
 
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
 
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -52,61 +66,50 @@ export default function Profile() {
 
   const headers = useMemo(() => getAuthHeaders(), []);
 
-  const loadMe = async () => {
-    setLoading(true);
-    setErr("");
-    setOk("");
-    try {
-      const res = await fetch(`${API}/me`, { headers });
-      if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const currentSection =
+    location.hash === "#security" ? "security" : "personal";
+const loadMe = async () => {
+  setLoading(true);
+  setErr("");
+  setOk("");
 
-      const data = await res.json();
-      setMe(data);
+  try {
+    const res = await fetch(`${API}/me`, { headers });
 
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          id: data?.id ?? null,
-          email: data?.email ?? "",
-          username: data?.username ?? "",
-          companyId: data?.companyId ?? null,
-          companyName: data?.companyName ?? "",
-          role: data?.role ?? roles?.[0] ?? "ADMIN",
-        })
-      );
-    } catch (e) {
-      setMe(null);
-      setErr(
-        e?.message === "UNAUTHORIZED"
-          ? "Session expirée. Reconnectez-vous."
-          : "Erreur chargement profil."
-      );
-    } finally {
-      setLoading(false);
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("UNAUTHORIZED");
     }
-  };
 
-  useEffect(() => {
-    loadMe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
 
-  const initials = useMemo(() => {
-    const u = me?.username || me?.email || "U";
-    const parts = String(u).split(/[\s.@_:-]+/).filter(Boolean);
-    return (
-      (parts[0]?.[0] || "U").toUpperCase() +
-      (parts[1]?.[0] || "").toUpperCase()
+    const data = await res.json();
+    setMe(data);
+
+    setFirstName(data?.firstName || "");
+    setLastName(data?.lastName || "");
+    setUsername(data?.username || "");
+    setEmail(data?.email || "");
+  } catch (e) {
+    setMe(null);
+    setErr(
+      e?.message === "UNAUTHORIZED"
+        ? "Session expirée. Reconnectez-vous."
+        : "Erreur chargement profil."
     );
-  }, [me]);
+  } finally {
+    setLoading(false);
+  }
+};
+  const displayRole = me?.role || roles[0] || "ADMIN";
 
-  const displayRole =
-    me?.role ||
-    roles[0] ||
-    "ADMIN";
+  const canSaveProfile =
+    username.trim() &&
+    email.trim() &&
+    !loading;
 
-  const canSave =
+  const canSavePassword =
     oldPassword.trim() &&
     newPassword.trim() &&
     newPassword.trim().length >= 8 &&
@@ -124,6 +127,66 @@ export default function Profile() {
       ? "Fort"
       : "Très fort";
 
+  const validateEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+  const saveProfile = async () => {
+    setErr("");
+    setOk("");
+
+    if (!username.trim() || !email.trim()) {
+      setErr("Veuillez remplir tous les champs du profil.");
+      return;
+    }
+
+    if (!validateEmail(email.trim())) {
+      setErr("Veuillez saisir une adresse email valide.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (!currentUserId) throw new Error("Utilisateur introuvable.");
+
+      const res = await fetch(`${API}/${currentUserId}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          username: username.trim(),
+          email: email.trim().toLowerCase(),
+        }),
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("Accès refusé.");
+      }
+
+      if (!res.ok) {
+        throw new Error("Erreur lors de la mise à jour du profil.");
+      }
+
+      const updated = await res.json().catch(() => null);
+
+      const nextUser = {
+        ...(updated || me || {}),
+        firstName: updated?.firstName ?? firstName.trim(),
+        lastName: updated?.lastName ?? lastName.trim(),
+        username: updated?.username ?? username.trim(),
+        email: updated?.email ?? email.trim().toLowerCase(),
+        role: updated?.role ?? me?.role ?? displayRole,
+      };
+
+      setMe(nextUser);
+      localStorage.setItem("user", JSON.stringify(nextUser));
+      setOk("Profil mis à jour avec succès.");
+    } catch (e) {
+      setErr(e.message || "Erreur.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const changePassword = async () => {
     setErr("");
     setOk("");
@@ -140,7 +203,9 @@ export default function Profile() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API}/me/password`, {
+      if (!currentUserId) throw new Error("Utilisateur introuvable.");
+
+      const res = await fetch(`${API}/${currentUserId}/password`, {
         method: "POST",
         headers,
         body: JSON.stringify({ oldPassword, newPassword }),
@@ -148,7 +213,7 @@ export default function Profile() {
 
       if (res.status === 401) throw new Error("Ancien mot de passe incorrect.");
       if (res.status === 403) throw new Error("Accès refusé.");
-      if (!res.ok) throw new Error("Erreur lors du changement de mot de passe.");
+      if (!res.ok) throw new Error("Ancien mot de passe est incorrect.");
 
       setOldPassword("");
       setNewPassword("");
@@ -160,190 +225,177 @@ export default function Profile() {
     }
   };
 
-  const goBack = () => {
-    if (window.history.length > 2) navigate(-1);
-    else navigate(isAdmin ? "/dashboard" : "/profile", { replace: true });
+  const clearProfile = () => {
+    setFirstName(me?.firstName || "");
+    setLastName(me?.lastName || "");
+    setUsername(me?.username || "");
+    setEmail(me?.email || "");
   };
 
   return (
-    <div className="accountPage">
+    <div className="profile-page">
       {(err || ok || loading) && (
-        <div className="accountMessages">
-          {err && <div className="alert danger">{err}</div>}
-          {ok && <div className="alert success">{ok}</div>}
-          {!err && loading && <div className="alert">Chargement…</div>}
+        <div className="profile-messages">
+          {err && <div className="profile-alert danger">{err}</div>}
+          {ok && <div className="profile-alert success">{ok}</div>}
+          {!err && loading && <div className="profile-alert">Chargement...</div>}
         </div>
       )}
 
-      <div className="accountCard">
-        <div className="accountHeader">
-          <div className="accountAvatar">{initials || "U"}</div>
-
-          <div className="accountIdentity">
-            <h2>{me?.username || me?.email || "—"}</h2>
-            <div className="accountMainRole">{displayRole}</div>
-          </div>
-        </div>
-
-        <div className="accountInfoList">
-          <div className="accountInfoRow">
-            <div className="accountInfoIcon">
-              <UserIcon />
+      {currentSection === "personal" && (
+        <div className="simple-profile-card">
+          <div className="simple-card-head">
+            <div>
+              <h2>Informations personnelles</h2>
+              <p>Modifiez vos informations</p>
             </div>
-            <div className="accountInfoText">
-              <div className="accountInfoLabel">Username</div>
-              <div className="accountInfoValue">{me?.username || "—"}</div>
+
+            <div className="simple-head-right">
+              
+
+      
             </div>
           </div>
 
-          <div className="accountInfoRow">
-            <div className="accountInfoIcon">
-              <MailIcon />
-            </div>
-            <div className="accountInfoText">
-              <div className="accountInfoLabel">Email</div>
-              <div className="accountInfoValue">{me?.email || "—"}</div>
-            </div>
-          </div>
-
-          <div className="accountInfoRow">
-            <div className="accountInfoIcon">
-              <ShieldIcon />
-            </div>
-            <div className="accountInfoText">
-              <div className="accountInfoLabel">Roles</div>
-              <div className="accountRoles">
-                {(me?.role ? [me.role] : roles.length ? roles : ["ADMIN"]).map((role) => (
-                  <span key={role} className="roleBadge">
-                    {String(role).replace("ROLE_", "").toUpperCase()}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="securityCard">
-        <div className="securityHead">
-          <div>
-            <div className="securityTitle">Security</div>
-            <div className="securityDesc">Changer le mot de passe</div>
-          </div>
-
-          <button className="miniActionBtn" type="button" onClick={loadMe} disabled={loading}>
-            Refresh
-          </button>
-        </div>
-
-        <div className="securityGrid">
-          <label className="field">
-            <span>Ancien mot de passe</span>
-            <div className="passwordField">
-              <input
-                className="input"
-                type={showOld ? "text" : "password"}
-                value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                placeholder="Entrer l'ancien mot de passe"
-              />
-              <button
-                type="button"
-                className="eyeBtn"
-                onClick={() => setShowOld((p) => !p)}
-              >
-                {showOld ? "Hide" : "Show"}
-              </button>
-            </div>
-          </label>
-
-          <label className="field">
-            <span>Nouveau mot de passe</span>
-            <div className="passwordField">
-              <input
-                className="input"
-                type={showNew ? "text" : "password"}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Entrer le nouveau mot de passe"
-              />
-              <button
-                type="button"
-                className="eyeBtn"
-                onClick={() => setShowNew((p) => !p)}
-              >
-                {showNew ? "Hide" : "Show"}
-              </button>
-            </div>
-          </label>
-        </div>
-
-        <div className="pwdMeta">
-          <div className="pwdLine">
-            <span>Password strength</span>
-            <b>{strengthLabel}</b>
-          </div>
-
-          <div className="strengthBar">
-            <div
-              className="strengthFill"
-              style={{ width: `${(strength / 5) * 100}%` }}
-            />
-          </div>
-
-          <div className="hint">
-            8+ caractères, majuscule, minuscule, chiffre et symbole.
-          </div>
-        </div>
-
-        <div className="securityActions">
-          <button
-            className="btn ghost"
-            type="button"
-            onClick={() => {
-              setOldPassword("");
-              setNewPassword("");
+          <form
+            className="simple-form-grid"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveProfile();
             }}
           >
-            Clear
-          </button>
+            <div className="field-group">
+              <label>NOM</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Votre nom"
+              />
+            </div>
 
-          <button
-            className="btn primary"
-            type="button"
-            onClick={changePassword}
-            disabled={!canSave}
-          >
-            Save password
-          </button>
+            <div className="field-group">
+              <label>EMAIL</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="votre email"
+              />
+            </div>
+
+            <div className="form-actions full-row">
+              <button
+                className="secondary-btn"
+                type="button"
+                onClick={clearProfile}
+                disabled={loading}
+              >
+                Annuler
+              </button>
+
+              <button
+                className="primary-btn"
+                type="submit"
+                disabled={!canSaveProfile}
+              >
+                Enregistrer
+              </button>
+            </div>
+          </form>
         </div>
-      </div>
+      )}
+
+      {currentSection === "security" && (
+        <div className="simple-profile-card">
+          <div className="simple-card-head">
+            <div>
+              <h2>Sécurité</h2>
+              <p>Changer le mot de passe</p>
+            </div>
+          </div>
+
+          <div className="simple-form-grid">
+            <div className="field-group">
+              <label>ANCIEN MOT DE PASSE</label>
+              <div className="password-wrapper">
+                <input
+                  type={showOld ? "text" : "password"}
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  placeholder="Ancien mot de passe"
+                />
+                <button
+                  type="button"
+                  className="toggle-password"
+                  onClick={() => setShowOld((p) => !p)}
+                >
+                  {showOld ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+
+            <div className="field-group">
+              <label>NOUVEAU MOT DE PASSE</label>
+              <div className="password-wrapper">
+                <input
+                  type={showNew ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Nouveau mot de passe"
+                />
+                <button
+                  type="button"
+                  className="toggle-password"
+                  onClick={() => setShowNew((p) => !p)}
+                >
+                  {showNew ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+
+            <div className="pwd-meta full-row">
+              <div className="pwd-line">
+                <span>Password strength</span>
+                <b>{strengthLabel}</b>
+              </div>
+
+              <div className="strength-bar">
+                <div
+                  className="strength-fill"
+                  style={{ width: `${(strength / 5) * 100}%` }}
+                />
+              </div>
+
+              <div className="hint">
+                8+ caractères, majuscule, minuscule, chiffre et symbole.
+              </div>
+            </div>
+
+            <div className="form-actions full-row">
+              <button
+                className="secondary-btn"
+                type="button"
+                onClick={() => {
+                  setOldPassword("");
+                  setNewPassword("");
+                }}
+              >
+                Supprimer
+              </button>
+
+              <button
+                className="primary-btn"
+                type="button"
+                onClick={changePassword}
+                disabled={!canSavePassword}
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  );
-}
-
-function UserIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9">
-      <circle cx="12" cy="8" r="3.5" />
-      <path d="M5 20c1.8-3.2 4.2-4.8 7-4.8s5.2 1.6 7 4.8" />
-    </svg>
-  );
-}
-
-function MailIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9">
-      <path d="M4 6h16v12H4z" />
-      <path d="M4 7l8 6 8-6" />
-    </svg>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9">
-      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
-    </svg>
   );
 }
